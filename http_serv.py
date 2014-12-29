@@ -11,11 +11,10 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     hconf = {
             'user'     : {'title': 'User', 'type':'text'},
             'filename' : {'title': 'Patch', 'type': 'file'},
-            'branch'   : {'title': 'Branch', 'type': 'radio', 'values': ['10.0', '10.1', 'trunk']},
+            'branch'   : {'title': 'Branch', 'type': 'radio', 'values': ['10_0', '10_1', 'trunk']},
             'defects'  : {'title': 'Enable defects?', 'type': 'checkbox', 'values': ['yes']},
             'buildspec': {'title': 'Create buildspec?', 'type': 'checkbox', 'values': ['yes']},
-            'build'    : {'title': 'Build', 'values': ['old', 'new']},
-            'system'   : {'title': 'Test systems', 'type': 'checkbox', 'values': ['EngineTest', 'T_and_V']},
+            'systems'  : {'title': 'Test systems', 'type': 'checkbox', 'values': ['EngineTest', 'T_and_V']},
             'projects' : {'title': 'Projects', 'type': 'checkbox',
                          'values': ['android-5.0.2_r1', 'boost_1_57_0', 'firefox-35', 'linux-3.18.1']}
             }
@@ -53,21 +52,43 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         couch = couchdb.Server()
         db = couch['patches']
         docs = [ db[idx] for idx in db ]
-        
+
         # head
         table += '<tr>'
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
-            if 'type' in v:
-                table += '<th>' + v['title'] + '</th>'
+            table += '<th>' + v['title'] + '</th>'
+        table += '<th>' + 'Status' + '</th>'
         table += '</tr>'
-        
+
         # cells
         for doc in reversed(docs):
             table += '<tr>'
             for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
-                if 'type' in v:
-                    table += '<td>' + str(doc[k]) + '</td>'
+                table += '<td>' + str(doc[k]) + '</td>'
+            if 'status' in doc:
+                table += '<td>' + str(doc['status']) + '</td>'
             table += '</tr>'
+            # inner table
+            if 'res' in doc:
+                table += '<tr>'
+                table += '<td colspan=' + str(len(self.hconf.keys()) + 1) + ' >'
+                for k,v in doc['res'].items(): # k = project, v = { android : { attr : val, ... }, ... }
+                    table += '<table border=1 style="padding:10px;">'
+
+                    attrs = v.items() # [ (android, {attr1: val, ... }), ... ]
+
+                    table += '<tr><th>' + k + '</th>'
+                    for attr_name, attr_val in sorted(attrs[0][1].items(), key=lambda x: x[0]):
+                        table += '<th>' + attr_name + '</th>'
+                    table += '</tr>'
+
+                    for proj_name, proj_attrs in attrs:
+                        table += '<tr><td>' + proj_name + '</td>'
+                        for attr_name, attr_val in sorted(proj_attrs.items(), key=lambda x: x[0]):
+                            table += '<td>' + str(attr_val) + '</td>'
+                        table += '</tr>'
+                    table += '</table>'
+                table += '</tr>'
         table += '</table>'
         return table
 
@@ -77,9 +98,6 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         input_form += '<form action=/ method=POST ENCTYPE=multipart/form-data>'
 
         for k,v in sorted(self.hconf.items(), key=lambda x: x[1]):
-            if 'type' not in v:
-                continue
-
             input_form += '<fieldset><legend>' + v['title'] + '</legend>'
 
             if 'values' in v:
@@ -131,10 +149,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         for k,v in self.hconf.items():
             doc[k] = None
 
-            if 'type' not in v:
-                doc[k] = v['values']
-
-            elif v['type'] == 'radio' and k in form:
+            if v['type'] == 'radio' and k in form:
                 doc[k] = form[k].value
 
             elif v['type'] == 'checkbox':
