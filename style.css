@@ -1,0 +1,54 @@
+body, td, th {font-family: sans; font-size: 14; margin: 25; line-height: 1.3; vertical-align: top;}
+body {border: 0 solid #DDD;}
+
+table.main {border-collapse: collapse; margin: 0;}
+table.main tr td, th {border-bottom: 0 solid #CCC; padding: 5 10; vertical-align1: middle;}
+table.main tr:nth-child(2n) {background-color: #F8F8F8;}
+table.main tr {height: 50;}
+table.parameters tr td {padding: 10 4;}
+th {color: #AAA; padding: 15 7; font-weight: normal; font-size: 10; vertical-align: bottom;}
+
+a {color: #4183C4; text-decoration: none;}
+a:hover {color: #3070B0;}
+
+h2 {font-weight: normal; margin: 0; padding: 12 15; color: #444; font-size: 16;}
+
+form {padding-left: 5; padding-bottom: 5; margin: 0;}
+input[type=submit] 
+{	
+    padding: 10 50; background: #36D; border: 1 solid #14B; cursor: pointer; 
+    border-radius: 5; color: white; border-bottom: 2 solid #14B;
+}
+input[type=submit]:hover {background: #25C;}
+input.kill[type=submit] {padding: 0; background: none; border: none; color: black; font-size: 20;}
+input.kill[type=submit]:hover {color: #888;}
+
+div {float: left; border: 0 solid red; margin-right: 20;}
+
+.done, .testing {color: white; border-radius: 3; padding: 2 5; font-size: 11;}
+.done {background-color: #4A5;}
+.testing 
+{
+    background-color: #D00; animation: blink 1s steps(50, start) infinite; 
+    -webkit-animation: blink 1s steps(50, start) infinite;
+}
+.tag 
+{
+    color: #888; border: 1 solid #999; border-radius: 3; padding: 1 2; font-size: 10; 
+    position: relative; top: -1;
+}
+.status {text-align: center;}
+.log {text-align: center; font-size: 12;}
+.checkbox {cursor: pointer; text-indent: 25;}
+.label {vertical-align: middle; color: #AAA; font-size: 10; text-align: right;}
+.branch {margin-left: 5; position: relative; top: -2;}
+.send {border-right: solid 1 #DDD;}
+.zero {color: #DDD;}
+.grey {color: #888; font-size: 12;}
+.ti {text-indent: -25; margin: 0; margin-left: 25;}
+.ti:hover {color: #444;}
+.number {text-align: center; width: 30;}
+.tt {font-family: "Courier New";}
+.more {color: A80; background: ECA; border-radius: 3; padding: 1 4; font-size: 11; cursor: pointer;}
+@keyframes blink {to {background-color: #CCC;}}
+@-webkit-keyframes blink {to {background-color: #CCC;}}  	
