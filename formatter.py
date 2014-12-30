@@ -7,7 +7,7 @@ dictionary = {
     'EngineTests': 'Run Engine Tests',
     'TaV': 'Run T&V',
     'defects': 'Diff for defects',
-    'buildspec': 'Re-create buildspec'
+    'buildspec': 'Re-create buildspec',
     'android-5.0.2_r1': 'Android <span class = tag>5.0.2&nbsp;R1</span>',
     'boost_1_57_0': 'Boost <span class = tag>1.57.0</span>',
     'firefox-35': 'Firefox <span class = tag>35</span>',
