@@ -1,35 +1,31 @@
 #! /usr/bin/env python
 # coding=utf-8
 
-import os, cgi, re
-import couchdb
 import BaseHTTPServer
+import cgi
+import couchdb
+import formatter
+import os
+import re
 
 
 class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     hconf = {
-            'user': {'title': 'User', 'type':'text'},
-            'filename': {'title': 'Patch<br />file', 'type': 'file', 'style': 'tt'},
-            'branch': {'title': 'Branch', 'type': 'radio',
-                       'values': {'10_0': {}, '10_1': {}, 'trunk': {'caption': '#trunk'}}},
-            'defects': {'title': 'Enable<br />defects?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
-            'buildspec': {'title': 'Create<br />buildspec?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
-            'systems': {'title': 'Test<br />systems', 'type': 'checkbox',
-                       'values': {'EngineTest': {'caption': 'Engine Test'}, 'T_and_V': {'caption': 'T and V'}}},
-            'projects': {'title': 'Projects', 'type': 'checkbox',
-                         'values': {
-                             'android-5.0.2_r1': {'caption': 'Android#5.0.2 R1'},
-                             'boost_1_57_0': {'caption': 'Boost#1.57.0'},
-                             'firefox-35': {'caption': 'Firefox#35'},
-                             'linux-3.18.1': {'caption': 'Linux#3.18.1'},
-                         }}
-            }
+        'user': {'title': 'User', 'type': 'text'},
+        'filename': {'title': 'Patch<br />file', 'type': 'file', 'style': 'tt'},
+        'branch': {'title': 'Branch', 'type': 'radio', 'values': ['10_0', '10_1'], 'trunk': {'caption': '#trunk'}},
+        'defects': {'title': 'Enable<br />defects?', 'type': 'checkbox', 'values': ['yes']},
+        'buildspec': {'title': 'Create<br />buildspec?', 'type': 'checkbox', 'values': ['yes']},
+        'systems': {'title': 'Test<br />systems', 'type': 'checkbox', 'values': ['EngineTest', 'T_and_V']},
+        'projects': {'title': 'Projects', 'type': 'checkbox',
+                     'values': ['android-5.0.2_r1', 'boost_1_57_0', 'firefox-35', 'linux-3.18.1']}
+        }
 
     def get_log(self):
         f = open(os.curdir + os.sep + self.path)
         self.send_response(200)
-        self.send_header('Content-type',    'text/html')
+        self.send_header('Content-type', 'text/html')
         self.end_headers()
         buf = '<html><body><code>'
         buf += f.read()
@@ -40,7 +36,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def get_css(self):
         f = open(os.curdir + os.sep + self.path)
         self.send_response(200)
-        self.send_header('Content-type',    'text/css')
+        self.send_header('Content-type', 'text/css')
         self.end_headers()
         buf = f.read()
         self.wfile.write(buf)
@@ -56,29 +52,20 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         doc['status'] = 'Killing'
         db.save(doc)
         self.send_response(200)
-        self.send_header('Content-type',    'text/html')
+        self.send_header('Content-type', 'text/html')
         self.end_headers()
         buf = '<html><body><h1>Killing ' + doc['filename'] + '</h1></body></html>'
         self.wfile.write(buf)
 
-    @staticmethod
-    def format_tag(text):
-        """
-        Format string for HTML representation.
-
-        :param text: input string
-        :return formatted string
-        """
-        if '#' in text:
-            text = text[:text.find('#')] + ' <span class = tag>' + text[text.find('#') + 1:] + '</span>'
-        return text.strip()
-
-    def construct_result_table(self):
+    def construct_result_table(self, db_answer=None):
         table = '<table class = main>'
 
-        couch = couchdb.Server()
-        db = couch['patches']
-        docs = [db[idx] for idx in db]
+        if not db_answer:
+            couch = couchdb.Server()
+            db = couch['patches']
+            docs = [db[idx] for idx in db]
+        else:
+            docs = db_answer
 
         # head
         table += '<tr>'
@@ -98,22 +85,16 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     if isinstance(doc[k], list):
                         td = ''
                         for item in doc[k][:display_items]:
-                            if 'values' in self.hconf[k] and 'caption' in self.hconf[k]['values'][str(item)]:
-                                td += self.format_tag(self.hconf[k]['values'][item]['caption']) + '<br />'
-                            else:
-                                td += item + '<br />'
+                            td += formatter.get_caption(item) + '<br />'
                         if len(doc[k]) > 2:
                             index += 1
                             td += '<span id = "hidden' + str(index) + '" style = "display: none">'
                             for item in doc[k][display_items:]:
-                                if 'values' in self.hconf[k] and 'caption' in self.hconf[k]['values'][str(item)]:
-                                    td += self.format_tag(self.hconf[k]['values'][item]['caption']) + '<br />'
-                                else:
-                                    td += item + '<br />'
+                                td += formatter.get_caption(item) + '<br />'
                             td += '</span><div><span class = "more" id = "more' + str(index) + \
                                   '" onclick = "myFunction(' + str(index) + ')">more</span></div>'
                     else:
-                        td = str(doc[k])
+                        td = formatter.get_caption(str(doc[k]))
                     if 'style' in v:
                         td = '<span class = ' + v['style'] + '>' + td + '</span>'
                     table += '<td>' + td + '</td>'
@@ -134,7 +115,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     name = k if v['type'] == 'radio' else k + val
                     value = val if v['type'] == 'radio' else 'enabled'
 
-                    caption = self.format_tag(v['values'][val]['caption']) if 'caption' in v['values'][val] else val
+                    caption = formatter.get_caption(val)
 
                     input_form += '<p class = ti><label class = ' + v['type'] + '><input type=' + v['type'] + \
                                   ' name=' + name + ' value=' + value + ' /><span class = branch>' + caption + \
@@ -149,8 +130,8 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         input_form += '</form></div>'
         return input_form
 
-    def get_default(self):
-        result_table = self.construct_result_table()
+    def get_message(self, db_answer=None):
+        result_table = self.construct_result_table(db_answer=db_answer)
         input_form = self.construct_input_form()
 
         message = '<html><head><title>Upload</title><link rel = "stylesheet" type = "text/css" href = "style.css">\
@@ -177,6 +158,10 @@ function myFunction(number) {
 </script>
 '''
         message += '</body></html>'
+        return message
+
+    def get_default(self):
+        message = self.get_message()
 
         self.send_response(200)
         self.end_headers()
@@ -239,6 +224,9 @@ function myFunction(number) {
         couch = couchdb.Server()
         db = couch['patches']
         db.save(doc)
+
+    def test(self, docs):
+        return self.get_message(db_answer=docs)
 
 if __name__ == '__main__':
     try:
