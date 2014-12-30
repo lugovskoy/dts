@@ -71,6 +71,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
             if 'type' in v:
                 table += '<th>' + v['title'] + '</th>'
+        table += '<th>Realtime log</th>'
         table += '</tr>'
 
         index = 0
@@ -97,6 +98,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     if 'style' in v:
                         td = '<span class = ' + v['style'] + '>' + td + '</span>'
                     table += '<td>' + td + '</td>'
+            table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
             table += '</tr>'
         table += '</table>'
         return table
@@ -182,8 +184,6 @@ function myFunction(number) {
         doc = {}
 
         for k, v in self.hconf.items():
-            doc[k] = None
-
             if v['type'] == 'radio' and k in form:
                 doc[k] = form[k].value
 
