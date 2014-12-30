@@ -3,9 +3,9 @@ import re
 dictionary = {
     '10_0': '10.0',
     '10_1': '10.1',
-    'trunk': '<span class = tag>trunk</span>',
-    'EngineTests': 'Run Engine Tests',
-    'TaV': 'Run T&V',
+    'trunk': '<span class = tag>trunk</span>&nbsp;',
+    'EngineTests': 'Engine Tests',
+    'TaV': 'T & V',
     'defects': 'Diff for defects',
     'buildspec': 'Re-create buildspec',
     'android-5.0.2_r1': 'Android <span class = tag>5.0.2&nbsp;R1</span>',
@@ -20,20 +20,10 @@ def get_caption(text):
     if matcher:
         return matcher.group('name') + '<span class = grey>.patch</span>'
     if text in dictionary:
-        return dictionary[text]
-    else:
-        return text
+        text = dictionary[text]
+    text = text.replace(' & ', '<span class = small>&nbsp;&amp;&nbsp;</span>')
+    return text
 
 
-def format_tag(text):
-    """
-    Format string for HTML representation.
-
-    :param text: input string
-    :return formatted string
-    """
-    if '#' in text:
-        text = text[:text.find('#')] + ' <span class = tag>' + text[text.find('#') + 1:] + '</span>'
-    return text.strip()
-
-
+def get_status(text):
+    return '<span class = ' + text.lower() + '>' + text.lower() + '</span>'

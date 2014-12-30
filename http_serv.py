@@ -69,34 +69,51 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # head
         table += '<tr>'
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
-            if 'type' in v:
-                table += '<th>' + v['title'] + '</th>'
+            if k == 'filename':
+                caption = 'Patch file and user'
+            elif k in ['user']:  # Hidden fields in result table
+                continue
+            elif 'type' in v:
+                caption = v['title']
+            else:
+                continue
+            table += '<th>' + caption + '</th>'
         table += '</tr>'
 
         index = 0
-        display_items = 1
+        display_items = 2
 
         # cells
         for doc in reversed(docs):
             table += '<tr>'
             for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
-                if 'type' in v:
+                td = ''
+                if k == 'filename':
+                    td += '<tt>' + formatter.get_caption(str(doc[k])) + '</tt><br /><span class = user>' + \
+                          formatter.get_caption(str(doc['user'])) + '</span>'
+                elif k == 'user':
+                    continue
+                elif 'type' in v:
                     if isinstance(doc[k], list):
-                        td = ''
                         for item in doc[k][:display_items]:
                             td += formatter.get_caption(item) + '<br />'
-                        if len(doc[k]) > 2:
+                        if len(doc[k]) > display_items:
                             index += 1
                             td += '<span id = "hidden' + str(index) + '" style = "display: none">'
                             for item in doc[k][display_items:]:
                                 td += formatter.get_caption(item) + '<br />'
-                            td += '</span><div><span class = "more" id = "more' + str(index) + \
-                                  '" onclick = "myFunction(' + str(index) + ')">more</span></div>'
+                            td += '</span><div class = "more" id = "more' + str(index) + \
+                                  '" onclick = "myFunction(' + str(index) + ')">more</div>'
                     else:
                         td = formatter.get_caption(str(doc[k]))
                     if 'style' in v:
                         td = '<span class = ' + v['style'] + '>' + td + '</span>'
-                    table += '<td>' + td + '</td>'
+                else:
+                    continue
+                table += '<td>' \
+                         '' + td + '</td>'
+            if 'status' in doc:
+                table += '<td>' + formatter.get_status(doc['status'][0]) + '</td>'
             table += '</tr>'
         table += '</table>'
         return table
