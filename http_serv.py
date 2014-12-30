@@ -78,6 +78,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 continue
             table += '<th>' + caption + '</th>'
+        table += '<th>Realtime log</th>'
         table += '</tr>'
 
         index = 0
@@ -110,8 +111,8 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         td = '<span class = ' + v['style'] + '>' + td + '</span>'
                 else:
                     continue
-                table += '<td>' \
-                         '' + td + '</td>'
+                table += '<td>' + td + '</td>'
+            table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
             if 'status' in doc:
                 table += '<td>' + formatter.get_status(doc['status'][0]) + '</td>'
             table += '</tr>'
@@ -199,8 +200,6 @@ function myFunction(number) {
         doc = {}
 
         for k, v in self.hconf.items():
-            doc[k] = None
-
             if v['type'] == 'radio' and k in form:
                 doc[k] = form[k].value
 
