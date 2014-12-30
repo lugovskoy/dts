@@ -14,10 +14,9 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     hconf = {
         'user': {'title': 'User', 'type': 'text'},
         'filename': {'title': 'Patch<br />file', 'type': 'file', 'style': 'tt'},
-        'branch': {'title': 'Branch', 'type': 'radio', 'values': ['10_0', '10_1'], 'trunk': {'caption': '#trunk'}},
-        'defects': {'title': 'Enable<br />defects?', 'type': 'checkbox', 'values': ['yes']},
-        'buildspec': {'title': 'Create<br />buildspec?', 'type': 'checkbox', 'values': ['yes']},
-        'systems': {'title': 'Test<br />systems', 'type': 'checkbox', 'values': ['EngineTest', 'T_and_V']},
+        'branch': {'title': 'Branch', 'type': 'radio', 'values': ['10_0', '10_1', 'trunk']},
+        'options': {'title': 'Options', 'type': 'checkbox', 'values': ['defects', 'buildspec']},
+        'systems': {'title': 'Test<br />systems', 'type': 'checkbox', 'values': ['EngineTests', 'TaV']},
         'projects': {'title': 'Projects', 'type': 'checkbox',
                      'values': ['android-5.0.2_r1', 'boost_1_57_0', 'firefox-35', 'linux-3.18.1']}
         }
