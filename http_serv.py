@@ -114,7 +114,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 table += '<td>' + td + '</td>'
             table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
             if 'status' in doc:
-                table += '<td>' + formatter.get_status(doc['status'][0]) + '</td>'
+                table += '<td class = statustd>' + formatter.get_status(doc['status'][0]) + '</td>'
             table += '</tr>'
         table += '</table>'
         return table
