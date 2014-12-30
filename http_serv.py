@@ -12,10 +12,9 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             'user': {'title': 'User', 'type':'text'},
             'filename': {'title': 'Patch<br />file', 'type': 'file', 'style': 'tt'},
             'branch': {'title': 'Branch', 'type': 'radio',
-                       'values': {'10.0': {}, '10.1': {}, 'trunk': {'caption': '#trunk'}}},
+                       'values': {'10_0': {}, '10_1': {}, 'trunk': {'caption': '#trunk'}}},
             'defects': {'title': 'Enable<br />defects?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
             'buildspec': {'title': 'Create<br />buildspec?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
-            'build': {'title': 'Build', 'values': {'old': {}, 'new': {}}},
             'system': {'title': 'Test<br />systems', 'type': 'checkbox',
                        'values': {'EngineTest': {'caption': 'Engine Test'}, 'T_and_V': {'caption': 'T and V'}}},
             'projects': {'title': 'Projects', 'type': 'checkbox',
@@ -71,14 +70,14 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         couch = couchdb.Server()
         db = couch['patches']
         docs = [db[idx] for idx in db]
-        
+
         # head
         table += '<tr>'
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
             if 'type' in v:
                 table += '<th>' + v['title'] + '</th>'
         table += '</tr>'
-        
+
         index = 0
         display_items = 1
 
@@ -119,9 +118,6 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         input_form += '<table class = parameters>'
 
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
-            if 'type' not in v:
-                continue
-
             input_form += '<tr><td class = label>' + v['title'] + '</td><td>'
 
             if 'values' in v:
@@ -193,10 +189,7 @@ function myFunction(number) {
         for k, v in self.hconf.items():
             doc[k] = None
 
-            if 'type' not in v:
-                doc[k] = v['values']
-
-            elif v['type'] == 'radio' and k in form:
+            if v['type'] == 'radio' and k in form:
                 doc[k] = form[k].value
 
             elif v['type'] == 'checkbox':
@@ -223,7 +216,7 @@ function myFunction(number) {
                     if len(chunk) == 0:
                         break
                     else:
-                        fp.write(chunk)ddi
+                        fp.write(chunk)
                 fp.close()
                 doc[k] = filename
 
