@@ -15,7 +15,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                        'values': {'10_0': {}, '10_1': {}, 'trunk': {'caption': '#trunk'}}},
             'defects': {'title': 'Enable<br />defects?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
             'buildspec': {'title': 'Create<br />buildspec?', 'type': 'checkbox', 'values': {'yes': {'caption': 'Yes'}}},
-            'system': {'title': 'Test<br />systems', 'type': 'checkbox',
+            'systems': {'title': 'Test<br />systems', 'type': 'checkbox',
                        'values': {'EngineTest': {'caption': 'Engine Test'}, 'T_and_V': {'caption': 'T and V'}}},
             'projects': {'title': 'Projects', 'type': 'checkbox',
                          'values': {
@@ -34,6 +34,15 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         buf = '<html><body><code>'
         buf += f.read()
         buf = buf.replace('\n', '<br/>') + '</code></body></html>'
+        self.wfile.write(buf)
+        f.close()
+
+    def get_css(self):
+        f = open(os.curdir + os.sep + self.path)
+        self.send_response(200)
+        self.send_header('Content-type',    'text/css')
+        self.end_headers()
+        buf = f.read()
         self.wfile.write(buf)
         f.close()
 
@@ -176,8 +185,10 @@ function myFunction(number) {
     def do_GET(self):
         if self.path.endswith(".log") or self.path.endswith("realtime"):
             self.get_log()
-        if self.path.endswith(".kill?") or self.path.endswith(".kill"):
+        elif self.path.endswith(".kill?") or self.path.endswith(".kill"):
             self.get_kill()
+        elif self.path.endswith("css"):
+            self.get_css()
         else:
             self.get_default()
 
