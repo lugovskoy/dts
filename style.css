@@ -30,14 +30,15 @@ div {float: left; border: 0 solid red; margin-right: 20;}
 .done, .testing, .waiting, .processing, .fail, .failed
 {color: white; border-radius: 3; padding: 1 3; font-size: 11;}
 
+.status {font-size: 11;}
+
 .done {border: 1 solid #4A5; color: #4A5}
 .fail, .failed {border: 1 solid #D00; color: #D00}
+.waiting {border: 1 solid #AAA; color: #AAA;}
 
-.testing {border: 1 solid #D00; background: #D00; color: #FFF;}
-.processing {border: 1 solid #D80; background: #D80; color: #FFF;}
-.waiting {border: 1 solid #AAA; background: #AAA; color: #FFF;}
+.testing, .processing {border: 1 solid #AAA; background: #AAA; color: #FFF;}
 
-.testing, .processing, .waiting {-webkit-animation: blink 1s steps(50, start) infinite;}
+.testing, .processing {-webkit-animation: blink 1s steps(50, start) infinite;}
 .tag
 {
     color: #888; border: 1 solid #999; border-radius: 3; padding: 1 2; font-size: 10; 

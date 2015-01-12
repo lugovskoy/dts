@@ -9,7 +9,7 @@ import os
 import re
 
 
-class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
 
     hconf = {
         'user': {'title': 'User', 'type': 'text'},

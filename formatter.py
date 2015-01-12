@@ -26,4 +26,4 @@ def get_caption(text):
 
 
 def get_status(text):
-    return '<span class = ' + text.lower() + '>' + text.lower() + '</span>'
+    return '<span class = status><span class = ' + text.lower() + '>' + text.lower() + '</span></span>'
