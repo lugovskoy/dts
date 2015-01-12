@@ -6,6 +6,7 @@ dictionary = {
     'trunk': '<span class = tag>trunk</span>&nbsp;',
     'EngineTests': 'Engine Tests',
     'TaV': 'T & V',
+    'build': 'Build',
     'defects': 'Diff for defects',
     'buildspec': 'Re-create buildspec',
     'android-5.0.2_r1': 'Android <span class = tag>5.0.2&nbsp;R1</span>',
@@ -27,3 +28,9 @@ def get_caption(text):
 
 def get_status(text):
     return '<span class = status><span class = ' + text.lower() + '>' + text.lower() + '</span></span>'
+
+
+def get_boolean(value, for_true, for_false):
+    if value:
+        return '<span class = status><span class = good>' + for_true + '</span></span>'
+    return '<span class = status><span class = bad>' + for_false + '</span></span>'

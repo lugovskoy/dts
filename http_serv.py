@@ -9,7 +9,7 @@ import os
 import re
 
 
-class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
+class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     hconf = {
         'user': {'title': 'User', 'type': 'text'},
@@ -57,6 +57,12 @@ class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write(buf)
 
     def construct_result_table(self, db_answer=None):
+        """
+        Construct table with information about current patches.
+
+        :param db_answer: database answer, if None, answer will be written from couchdb server
+        :return: HTML formatted table
+        """
         table = '<table class = main>'
 
         if not db_answer:
@@ -66,7 +72,7 @@ class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
         else:
             docs = db_answer
 
-        # head
+        # Table header
         table += '<tr>'
         for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
             if k == 'filename':
@@ -78,13 +84,13 @@ class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 continue
             table += '<th>' + caption + '</th>'
-        table += '<th>Realtime log</th>'
+        table += '<th>Realtime<br />log</th>'
         table += '</tr>'
 
         index = 0
         display_items = 2
 
-        # cells
+        # Table cells
         for doc in reversed(docs):
             table += '<tr>'
             for k, v in sorted(self.hconf.items(), key=lambda x: x[1]):
@@ -113,27 +119,32 @@ class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
                     continue
                 table += '<td>' + td + '</td>'
             table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
-            table += '<td class = statustd>' + formatter.get_status(doc['status']) + '</td>'
+            table += '<td>' + formatter.get_status(doc['status']) + '</td>'
             table += '</tr>'
 
-            # inner table with build results
+            # Inner table with build results
             if 'res' in doc:
-                table += '<tr>'
-                table += '<td colspan=' + str(len(self.hconf.keys()) + 2) + ' >'
-                for k,v in doc['res'].items(): # k = project, v = { android : { attr : val, ... }, ... }
-                    table += '<table border=1 style="padding:10px;">'
+                table += '<tr><td style="border: none;" colspan=' + str(len(self.hconf.keys()) + 2) + ' >'
+                for k, v in doc['res'].items():  # k = project, v = {android: { attr: val, ...}, ...}
+                    table += '<table class = result>'
 
-                    attrs = v.items() # [ (android, {attr1: val, ... }), ... ]
+                    attrs = v.items()  # [{android: {attr1: val, ...}}, ...]
 
-                    table += '<tr><th>' + k + '</th>'
+                    table += '<tr><th></th>'
                     for attr_name, attr_val in sorted(attrs[0][1].items(), key=lambda x: x[0]):
-                        table += '<th>' + attr_name + '</th>'
+                        table += '<th>'
+                        if attr_name != 'Passed':
+                            table += attr_name
+                        table += '</th>'
                     table += '</tr>'
 
                     for proj_name, proj_attrs in attrs:
-                        table += '<tr><td>' + proj_name + '</td>'
+                        table += '<tr><td>' + formatter.get_caption(proj_name) + '</td>'
                         for attr_name, attr_val in sorted(proj_attrs.items(), key=lambda x: x[0]):
-                            table += '<td>' + str(attr_val) + '</td>'
+                            if attr_name == 'Passed':
+                                table += '<td>' + formatter.get_boolean(str(attr_val), 'passed', 'failed') + '</td>'
+                            else:
+                                table += '<td>' + str(attr_val) + '</td>'
                         table += '</tr>'
                     table += '</table>'
                 table += '</tr>'
@@ -219,7 +230,7 @@ function myFunction(number) {
     def do_POST(self):
         form = cgi.FieldStorage(fp=self.rfile, headers=self.headers,
                                 environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type'], })
-        doc = {'status':'Waiting'}
+        doc = {'status': 'Waiting'}
 
         for k, v in self.hconf.items():
             if v['type'] == 'radio' and k in form:
