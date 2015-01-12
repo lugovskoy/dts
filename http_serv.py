@@ -113,9 +113,31 @@ class GetHandler:  # (BaseHTTPServer.BaseHTTPRequestHandler):
                     continue
                 table += '<td>' + td + '</td>'
             table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
-            if 'status' in doc:
-                table += '<td class = statustd>' + formatter.get_status(doc['status'][0]) + '</td>'
+            table += '<td class = statustd>' + formatter.get_status(doc['status']) + '</td>'
             table += '</tr>'
+
+            # inner table with build results
+            if 'res' in doc:
+                table += '<tr>'
+                table += '<td colspan=' + str(len(self.hconf.keys()) + 2) + ' >'
+                for k,v in doc['res'].items(): # k = project, v = { android : { attr : val, ... }, ... }
+                    table += '<table border=1 style="padding:10px;">'
+
+                    attrs = v.items() # [ (android, {attr1: val, ... }), ... ]
+
+                    table += '<tr><th>' + k + '</th>'
+                    for attr_name, attr_val in sorted(attrs[0][1].items(), key=lambda x: x[0]):
+                        table += '<th>' + attr_name + '</th>'
+                    table += '</tr>'
+
+                    for proj_name, proj_attrs in attrs:
+                        table += '<tr><td>' + proj_name + '</td>'
+                        for attr_name, attr_val in sorted(proj_attrs.items(), key=lambda x: x[0]):
+                            table += '<td>' + str(attr_val) + '</td>'
+                        table += '</tr>'
+                    table += '</table>'
+                table += '</tr>'
+
         table += '</table>'
         return table
 
@@ -197,7 +219,7 @@ function myFunction(number) {
     def do_POST(self):
         form = cgi.FieldStorage(fp=self.rfile, headers=self.headers,
                                 environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type'], })
-        doc = {}
+        doc = {'status':'Waiting'}
 
         for k, v in self.hconf.items():
             if v['type'] == 'radio' and k in form:
