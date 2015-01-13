@@ -84,7 +84,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 continue
             table += '<th>' + caption + '</th>'
-        table += '<th>Realtime<br />log</th>'
+        table += '<th>Real<br />time<br />log</th>'
         table += '</tr>'
 
         index = 0
@@ -118,8 +118,8 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 else:
                     continue
                 table += '<td>' + td + '</td>'
-            table += '<td><a href=' + doc['_id'] + '/realtime >log</a></td>'
-            table += '<td>' + formatter.get_status(doc['status']) + '</td>'
+            table += '<td><a href=' + doc['_id'] + '/realtime ><img src = image/eye.svg /></a></td>'
+            table += '<td>' + formatter.get_status(doc['status']) + '&nbsp;</td>'
             table += '</tr>'
 
             # Inner table with build results
@@ -142,7 +142,7 @@ class GetHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         table += '<tr><td>' + formatter.get_caption(proj_name) + '</td>'
                         for attr_name, attr_val in sorted(proj_attrs.items(), key=lambda x: x[0]):
                             if attr_name == 'Passed':
-                                table += '<td>' + formatter.get_boolean(str(attr_val), 'passed', 'failed') + '</td>'
+                                table += '<td>' + formatter.get_boolean(attr_val, 'passed', 'failed') + '</td>'
                             else:
                                 table += '<td>' + str(attr_val) + '</td>'
                         table += '</tr>'
