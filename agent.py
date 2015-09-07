@@ -13,22 +13,19 @@ import couchdb
 
 
 class Task:
-    def __init__(self, name, args):
+    def __init__(self, name, output_dir, log):
         self.__args = args
-        # TODO check that functions exists in task modules
-        self.__is_initialized = getattr(__import__(name, fromlist=['is_enabled']), 'is_enabled')
-        self.__initialize = getattr(__import__(name, fromlist=['is_enabled']), 'is_enabled')
-        self.__is_enabled = getattr(__import__(name, fromlist=['is_enabled']), 'is_enabled')
-        self.__run = getattr(__import__(name, fromlist=['is_enabled']), 'is_enabled')
+        sub_cls = getattr(__import__(name, fromlist=['SubTask']), 'SubTask')
+        self.__sub_task = sub_cls(output_dir, log)
         self.__proc = None
 
 
     def is_initialized(self):
-        return self.__is_initialized()
+        return self.__sub_task.is_initialized()
 
 
     def initialize(self):
-        self.__initialize()
+        self.__sub_task.initialize()
 
 
     def is_alive(self):
@@ -37,7 +34,7 @@ class Task:
 
     def run(self, output_dir, log):
         self.__q = Queue()
-        self.__proc = Process(target=worker, args=(self.__q, self.__args, output_dir, log))
+        self.__proc = Process(target=self.__sub_task.run args=(self.__q, self.__args))
         self.__proc.start()
 
 
@@ -45,8 +42,8 @@ class Task:
         return self.__proc is not None
 
 
-    def collect_refs(self, tasks):
-        pass
+    def collect_argrefs(self, tasks):
+        pass # update self.__args
 
 
     def get_result(self):
@@ -65,9 +62,16 @@ class Req:
         self.__running_task = None
         self.__finished = False
 
+        global script_path
+
         for task in tasks:
-            self.__tasks.append(Task(task['name'], task['args']))
-            self.__name2task[task['name']] = self.__tasks[-1]
+            output_dir = os.path.join(script_path, 'results', doc['_id'], task_name)
+            os.makedirs(output_dir) if not os.path.isdir(output_dir)
+            task_log = output_dir + '.log'
+            open(task_log, 'w').close() # recreate log for a task
+            T = Task(task['name'], task['args'], output_dir, task_log)
+            self.__tasks.append(T)
+            self.__name2task[task['name']] = T
 
 
     def probe(self, doc, db):
@@ -89,14 +93,11 @@ class Req:
             self.__dump() # TODO
             self.__running_task = None
         else: # start & init task
-            self.__running_task.collect_refs(self.__name2task)
             if not self.__running_task.is_enabled():
                 self.__running_task = None
             else:
-                global script_path
-                output_dir = os.path.join(script_path, 'results', doc['_id'], task_name)
-                os.makedirs(output_dir) if not os.path.isdir(output_dir)
-                self.__running_task.run(output_dir, output_dir + '.log')
+                self.__running_task.collect_argrefs()
+                self.__running_task.run()
 
 
     def finished(self):
