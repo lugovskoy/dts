@@ -5,19 +5,24 @@ import os.path
 import subprocess
 
 
-class SubClass():
+class SubTask():
     def __init__(self, output_dir, log):
         self.__output_dir = output_dir
         self.__log = log
         self.__wd = os.path.dirname(os.path.realpath(__file__))
         self.__init_done = False
+        print "__init__"
 
 
     def is_initialized(self):
+        print "init", self.__init_done
         return self.__init_done
 
 
     def initialize(self):
+        self.__init_done = True
+        print "initialize"
+        return 
         script = os.path.join(self.__wd, 'get_gcc.sh')
         retcode = subprocess.call([script, self.__wd])
         self.__init_done = retcode == 0
@@ -35,6 +40,9 @@ class SubClass():
 
 
     def run(self, q, args):
+        print "run"
+        q.put({'retcode': 0, 'result': {'head': ['time', 'name'], 'body': [[12.3, 'foo'], [44.77, 'bar']]}})
+        return
         script = os.path.join(self.__wd, 'conf_and_make.sh')
         retcode = subprocess.call([script, self.__wd, self.__output_dir, self.__log])
         q.put({'retcode': retcode, 'result': self.__result(self.__output_dir, retcode)})

@@ -16,14 +16,14 @@ import formatter
 
 
 
-table_name = 'patches_un' 
-config_path = 'config.json'
+table_name = 'requests'
+
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def __get_log(self):
         idx = re.search('/(.+?)\.log', self.path).group(1)
-        couch = couchdb.Server('http://10.1.0.35:5984')
+        couch = couchdb.Server()
         db = couch[table_name]
         if idx not in db:
             return
@@ -41,164 +41,47 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write(buf)
 
 
-    def __construct_result_table(self, conf, db_answer=None):
-        """
-        Construct table with information about current patches.
+    def __construct_table(self, title, results):
+        logger.debug('__construct_table with {0} and {1}'.format(title, results))
+        if results is None:
+            results = {}
+        table = '<tr>'
+        rowspan = len(results)
+        table += '<th rowspan={0}>{1}</th>'.format(rowspan, title)
+        for k, v in results.items():
+            logger.debug('output value {0}'.format(v))
+            if not isinstance(v, dict):
+                table += '<th>{0}</th><td>{1}</td></tr>'.format(k, v)
+            elif 'name' in v and 'content' in v: # v is file
+                table += '<th>{0}</th><td>{1}</td></tr>'.format(k, v['name'])
+            elif 'head' in v and 'body' in v: # v is table
+                res_table = '<table>'
+                res_table += '<tr>' + ''.join(['<th>{0}</th>'.format(tk) for tk in v['head']]) + '</tr>'
+                for row in v['body']:
+                    res_table += '<tr>' + ''.join(['<td>{0}</td>'.format(rv) for rv in row]) + '</tr>'
+                res_table += '</table>'
+                table += '<th>{0}</th><td>{1}</td></tr>'.format(k, res_table)
+            table += '<tr>'
+        table += '</tr>'
+        return table
 
-        :param db_answer: database answer, if None, answer will be written from couchdb server
-        :return: HTML formatted table
-        """
-        #table = '<table class = main>'
 
-        if db_answer is None:
-            couch = couchdb.Server('http://10.1.0.35:5984')
-            db = couch[table_name]
-            docs = [db[idx] for idx in db]
-        else:
-            docs = db_answer
+    def __construct_result_table(self):
+        couch = couchdb.Server()
+        db = couch[table_name]
+        docs = [db[idx] for idx in db]
 
-        # Table header constructed by specification from config.json and header.json
         table = ''
 
         # Table cells
-        for doc in sorted(docs, key=lambda d: d['timestampt'], reverse=True):
-            tasks = doc['tasks']
+        for req in sorted(docs, key=lambda d: d['timestampt'], reverse=True):
             table += '<table border=1>'
-
-            # Fields from specifications and their args
-            for task_spec in conf['tasks']:
-
-                table += '<tr>'
-                title = task_spec['title'] if 'title' in task_spec else task_spec['name']
-                rowspan = len([p for p in task_spec['params'] if 'visibility' not in p or p['visibility'] != 'hidden'])
-                table += '<th rowspan=' + str(rowspan) + '>' + title + '</th>'
-
-                tr_is_open = True
-                for param_spec in task_spec['params']:
-
-                    task = tasks[task_spec['name']]
-
-                    if 'visibility' in param_spec and param_spec['visibility'] == 'hidden':
-                        continue
-                    
-                    if not tr_is_open:
-                        table += '<tr>'
-                    
-                    title = param_spec['title'] if 'title' in param_spec else param_spec['name']
-                    table += '<th>' + title + '</th>'
-
-                    if 'args' not in task:
-                        arg = '&lt;optimized out&gt;'
-                    else:
-                        arg_name = param_spec['name']
-                        arg_type = param_spec['type']
-                        arg = task['args'][arg_name] if arg_name in task['args'] else ''
-
-                        if arg_type == 'file':
-                            arg = arg['name']
-                        elif isinstance(arg, bool):
-                            arg = '<span style = "font-size: 85%;">' + (u'●' if arg else u'○') + '</span>'
-                        elif isinstance(arg, list):
-                            arg = '<br />'.join(map((lambda x : formatter.get_caption(x)), arg))
-                        else:
-                            arg = formatter.get_caption(str(arg))
-
-                    table += '<td>' + arg + '</td>'
-                    table += '</tr>'
-                    tr_is_open = False
-
-
-            # HEAD
-            with open(os.path.join(script_path, '..', 'header.json')) as f:
-                head = json.load(f)
             
-            table += '<tr>'
-            table += '<th rowspan=' + str(len(head)) + '>System</th>'
+            for task_name, task_opts in req['tasks'].items():
+                table += self.__construct_table(task_name, task_opts['args'])
 
-            tr_is_open = True
-            for field in head:
-                if not tr_is_open:
-                    table += '<tr>'
-                
-                table += '<th>' + field + '</th>'
-                arg = '&lt;optimized out&gt;'
-                if field == 'log':
-                    img_fname = "eye.png"
-                    if 'status' in doc:
-                        status_icon = os.path.join('imgs', doc['status'].lower() + '.jpg')
-                        if os.path.isfile(os.path.join(script_path, status_icon)):
-                            img_fname = status_icon
-                    arg = '<a href=' + doc['_id'] + '.log><img width="40" height="40" src=' + img_fname + ' /></a>'
-                elif field == 'status':
-                    arg = formatter.get_status(doc[field])
-                else:
-                    arg = formatter.get_caption(doc[field])
-                
-                table += '<td>' + arg + '</td>'
-                table += '</tr>'
-                tr_is_open = False
-
-            # Inner table with build results
-            table += '<tr>'
-            rowspan = len([ ts for ts in conf['tasks'] if 'result' in tasks[ts['name']]])
-            table += '<th rowspan=' + str(rowspan) + ' >Results</th>'
-
-            tr_is_open = True
-            for task_spec in conf['tasks']:
-
-                if 'result' not in tasks[task_spec['name']]:
-                    continue
-                
-                if not tr_is_open:
-                    table += '<tr>'
-
-                title = task_spec['title'] if 'title' in task_spec else task_spec['name']
-                table += '<th>' + title + '</th>'
-
-                arg = ''
-
-                results = tasks[task_spec['name']]['result']
-                for return_spec in task_spec['return']:
-
-                    if 'visibility' in return_spec and return_spec['visibility'] == 'hidden':
-                        continue
-
-                    ret_name = return_spec['name']
-                    if ret_name not in results:
-                        continue
-
-                    arg += '<table class = result>'
-
-                    if return_spec['type'] == 'bool':
-                        head_name = return_spec['title'] if 'title' in return_spec else ret_name
-                        arg += '<tr><th>' + head_name + '</th></tr>'
-                        arg += '<tr><td>' + str(results[ret_name]) + '</td></tr>'
-                    elif return_spec['type'] == 'table':
-                        res_table = results[ret_name]
-
-                        arg += '<tr>' + ''.join(['<th>' + str(k) + '</th>' for k in res_table['head']]) + '</tr>'
-                        for row in res_table['body']:
-                            arg += '<tr>' + ''.join(['<td>' + str(v) + '</td>' for v in row]) + '</tr>'
-
-                    arg += '</table>'
-
-                if arg == '':
-                    arg = '&lt;optimized out&gt;'
-
-                table += '<td>' + arg + '</td>'
-                table += '</tr>'
-                tr_is_open = False
-
-            # Kill link
-            table += '<tr>'
-            table += '<td/><td align="center" bgcolor="red"><b><font color="white" size+=1>'
-            if doc['status'] in ['Failed', 'Done', 'Killing']:
-                table += '<a href=' + doc['_id'] + '.rem>R E M O V E</a>'
-            else:
-                table += '<a href=' + doc['_id'] + '.kill>K I L L</a>'
-            table += '</font></b></td><td/>'
-            table += '<tr>'
-
+            table += self.__construct_table('System', {'status': req['status'], 'host': req['host']})
+            table += self.__construct_table('Results', task_opts.get('result', dict()))
             table += '</table><br/>'
         return table
 
@@ -297,7 +180,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         form += '</td><td><div class=form>'
 
-        #form += self.__construct_result_table(conf)
+        form += self.__construct_result_table()
 
         form += '</div></td></tr></table>'
         form += '</body></html>'
@@ -360,9 +243,6 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 else:
                     logger.warning('incorrect param type {0} in request'.format(param_type))
 
-        print tasks_args
-
-
         self.send_response(200)
         self.end_headers()
 
@@ -374,10 +254,11 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         doc = {'version': 1,
                'timestampt': time.time(),
                'host': None,
+               'status': 'Waiting',
                'tasks': tasks_args}
 
-        couch = couchdb.Server('http://{0}', srv_addr)
-        db = couch['requests']
+        couch = couchdb.Server()
+        db = couch[table_name]
         db.save(doc)
 
 
@@ -392,6 +273,10 @@ if __name__ == '__main__':
     logger.basicConfig(level=logger.DEBUG)
     handler_class = MyHandler
     try:
+        couch = couchdb.Server()
+        if table_name not in couch:
+            couch.create(table_name)
+
         port = 8080 
         url = "http://bop:%d/" % port
         print "Ask user to visit this URL:\n\t%s" % url
@@ -399,3 +284,4 @@ if __name__ == '__main__':
         srvr.serve_forever()  # serve_forever
     except KeyboardInterrupt:
         pass
+
