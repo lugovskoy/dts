@@ -3,9 +3,10 @@
 WORKDIR=$1
 OUTDIR=$2
 LOG=$3
+TCC=$4
 
-cd $WORKDIR/tcc-0.9.26
+cd $WORKDIR
 
-./configure --prefix $OUTDIR/tcc 1>>$LOG 2>&1 || exit 1
+CC=$TCC ./configure --prefix $OUTDIR/zlib 1>>$LOG 2>&1 || exit 1
 make -j8 1>>$LOG 2>&1 || exit 1
 make install 1>>$LOG 2>&1 || exit 1

@@ -20,10 +20,9 @@ class SubTask():
 
 
     def initialize(self):
-        self.__init_done = True
         print "initialize"
-        return 
-        script = os.path.join(self.__wd, 'get_gcc.sh')
+        self.__init_done = True
+        script = os.path.join(self.__wd, 'get_tcc.sh')
         retcode = subprocess.call([script, self.__wd])
         self.__init_done = retcode == 0
 
@@ -41,10 +40,6 @@ class SubTask():
 
     def run(self, q, args):
         print "run"
-        q.put({'retcode': 0, 'result': {'head': ['time', 'name'], 'body': [[12.3, 'foo'], [44.77, 'bar']]}})
-        return
         script = os.path.join(self.__wd, 'conf_and_make.sh')
         retcode = subprocess.call([script, self.__wd, self.__output_dir, self.__log])
         q.put({'retcode': retcode, 'result': self.__result(self.__output_dir, retcode)})
-
-

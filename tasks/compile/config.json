@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "compile",
+  "title": "Gcc compiler",
+  "args": [
+    {"name": "prefix", "type": "text", "title": "Install directory prefix (used for configure script)"},
+    {"name": "patch", "type": "file", "title": "Patch file"},
+    {"name": "strip", "type": "bool", "title": "Strip symbol tables from resulting binaries?"},
+    {"name": "flags", "type": "checkbox", "values": ["Wall", "g", "O2"], "title": "Specify compiler flags"},
+    {"name": "lib", "type": "radio", "values": ["libtcc", "libgcc"], "title": "Select library to use"}
+  ],
+  "return": [
+    {"name": "passed", "type": "bool", "title": "Compilation"},
+    {"name": "tcc", "type": "text", "title": "Install directory of tcc"},
+  ]
+}
