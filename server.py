@@ -101,6 +101,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         for task_name, task in all_task_configs.items():
             title = task.get('title', task_name)
             form += '<fieldset><legend>' + title + '</legend>'
+            form += '<input type="hidden" name="{0}.version" value="{1}" />'.format(task_name, task['version'])
 
             for param in task['args']: #  {"name": "some_field", "type": "text", "title": "User Name"}
                 name = param['name']
@@ -179,7 +180,10 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         tasks_args = {}
 
         for k in form:
-            if k.endswith('.type'):
+            if k.endswith('.version'):
+                task_version = form[k].value
+                tasks_args.setdefault(task_name, dict()).setdefault('version', task_version)
+            elif k.endswith('.type'):
                 tkey_list = k.split('.')
                 task_name = tkey_list[0]
                 param_name = tkey_list[1]

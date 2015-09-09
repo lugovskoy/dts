@@ -199,6 +199,11 @@ def load_configs(couch):
 
         if task_sdir not in doc_dirs['names']:
             doc_dirs['names'].append(task_sdir)
+        else:
+            old_version = doc_configs[task_sdir]['version']
+            new_version = task_config['version']
+            if int(old_version) > int(new_version): # do not update with older version
+                task_config = doc_configs[task_sdir]
 
         doc_configs[task_sdir] = task_config
 
