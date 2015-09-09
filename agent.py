@@ -5,6 +5,7 @@ import os
 import os.path
 import sys
 import time
+import json
 import shutil
 import socket
 import logging as logger
@@ -22,6 +23,7 @@ class Task:
         self.__sub_task = sub_cls(output_dir, log)
         self.__proc = None
         self.__is_finished = False
+        self.__results = None
 
 
     def is_initialized(self):
@@ -48,6 +50,7 @@ class Task:
         if self.__proc is not None and not self.__proc.is_alive():
             self.__proc.join()
             self.__is_finished = True
+            self.__results = self.__q.get()
         return self.__is_finished
 
 
@@ -56,7 +59,7 @@ class Task:
 
 
     def get_result(self):
-        return self.__q.get()
+        return self.__results
 
 
     def get_name(self):
@@ -83,7 +86,7 @@ class Req:
                 os.makedirs(output_dir)
             task_log = output_dir + '.log'
             open(task_log, 'w').close() # recreate log for a task
-            T = Task(task_name, task_opts['args'], output_dir, task_log)
+            T = Task(task_name, task_opts['args'], task_opts['refs'], output_dir, task_log)
             logger.debug('Adding new task {0} with args {1}'.format(task_name, task_opts['args']))
             self.__tasks.append(T)
             self.__name2task[task_name] = T
@@ -112,7 +115,7 @@ class Req:
 
         if self.__running_task.is_alive():
             logger.debug('running task is {0} is alive'.format(self.__running_task))
-            task_log_buf = open(task.get_log()).read()
+            task_log_buf = open(self.__running_task.get_log()).read()
             db.put_attachment(doc, task_log_buf, 'log')
         elif self.__running_task.is_finished(): # task is finished
             logger.debug('running task is {0} is finished'.format(self.__running_task))
@@ -157,6 +160,52 @@ def __idx_locked(doc):
     return doc['status'] != 'Waiting'
 
 
+def load_configs(couch):
+    if 'tasks' not in couch:
+        couch.create('tasks')
+    db = couch['tasks']
+
+    if 'dirs' not in db:
+        db['dirs'] = {'names': []}
+    if 'configs' not in db:
+        db['configs'] = {}
+
+    doc_dirs = db['dirs']
+    doc_configs = db['configs']
+    
+    # load task configs
+    global script_path
+    tasks_dir = os.path.join(script_path, 'tasks')
+    logger.debug('Looking up for task modules in ' + tasks_dir)
+    for task_sdir in os.listdir(tasks_dir):
+        task_dir = os.path.join(tasks_dir, task_sdir)
+        logger.debug('pending {0}'.format(task_dir))
+        if not os.path.isdir(task_dir):
+            continue
+
+        task_config_fname = os.path.join(task_dir, 'config.json')
+        if not os.path.isfile(task_config_fname):
+            logger.warning('skipping task {0} becase config.json is missed'.format(task_dir))
+            continue
+
+        with open(task_config_fname) as f:
+            try:
+                task_config = json.load(f)
+            except ValueError, e:
+                logger.warning('task {0} config loading failed: {1}'.format(task_dir, e))
+                continue
+
+        logger.debug('task {0} config is loaded: {1}'.format(task_dir, task_config))
+
+        if task_sdir not in doc_dirs['names']:
+            doc_dirs['names'].append(task_sdir)
+
+        doc_configs[task_sdir] = task_config
+
+    db[doc_dirs.id] = doc_dirs
+    db[doc_configs.id] = doc_configs
+
+
 def go():
 
     req = None
@@ -194,6 +243,8 @@ def go():
                     req = Req(idx, doc)
                     __idx_lock(doc, db)
                     break
+
+        load_configs(couch)
 
 
 if __name__ == '__main__':

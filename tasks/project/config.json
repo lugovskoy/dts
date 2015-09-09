@@ -1,14 +1,11 @@
 {
   "version": 1,
-  "name": "project",
   "title": "Zlib library",
   "args": [
     {"name": "prefix", "type": "text", "title": "Install directory prefix (used for configure script)"},
-    {"name": "bit64", "type": "bool", "title": "Support for 64 bit"},
-    {"name": "tcc", "type": "text", "ref": "compile.tcc"}
+    {"name": "bit64", "type": "bool", "title": "Support for 64 bit"}
   ],
-  "return": [
-    {"name": "passed", "type": "bool", "title": "Compilation"},
-    {"name": "stat", "type": "table", "title": "Build statistics"}
+  "refs": [
+    {"name": "tcc", "ref": "compile.tcc"}
   ]
 }

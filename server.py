@@ -5,7 +5,6 @@ import os
 import os.path
 import re
 import sys
-import json
 import time
 import couchdb
 import logging as logger
@@ -86,50 +85,27 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return table
 
 
-    def __sort_task_configs(self, all_task_configs):
-        return all_task_configs.values() # TODO add sorting based on refs
-
-
     def __construct_input_form(self):
+        couch = couchdb.Server()
+        if 'tasks' not in couch:
+            all_task_configs = {}
+        else:
+            db = couch['tasks']
+            doc_dirs = db['dirs']
+            doc_configs = db['configs']
+            all_task_configs = { tdir: doc_configs[tdir] for tdir in doc_dirs['names'] }
+
         form = '<h2>MyForm</h2><form action=/ method=POST ENCTYPE=multipart/form-data>'
 
-        # load task configs
-        wd = os.path.dirname(os.path.realpath(__file__))
-        tasks_dir = os.path.join(wd, 'tasks')
-        logger.debug('Looking up for task modules in ' + tasks_dir)
-        all_task_configs = dict()
-        for task_dir in os.listdir(tasks_dir):
-            task_dir = os.path.join(tasks_dir, task_dir)
-            logger.debug('pending {0}'.format(task_dir))
-            if not os.path.isdir(task_dir):
-                continue
-
-            logger.debug('loading task from ' + task_dir)
-
-            task_config_fname = os.path.join(task_dir, 'config.json')
-            if not os.path.isfile(task_config_fname):
-                logger.warning('skipping task {0} becase config.json is missed'.format(task_dir))
-                continue
-
-            with open(task_config_fname) as f:
-                task_config = json.load(f)
-                logger.debug('task {0} config is loaded: {1}'.format(task_dir, task_config))
-
-            all_task_configs[task_config['name']] = task_config
-
         # construct tasks form
-        sorted_tasks = self.__sort_task_configs(all_task_configs)
-        for task in sorted_tasks:
-            title = task['title'] if 'title' in task else task['name']
+        for task_name, task in all_task_configs.items():
+            title = task.get('title', task_name)
             form += '<fieldset><legend>' + title + '</legend>'
 
             for param in task['args']: #  {"name": "some_field", "type": "text", "title": "User Name"}
-                if 'ref' in param: # skip referenced params
-                    continue
-
                 name = param['name']
-                key = task['name'] + '.' + name
-                tkey = task['name'] + '.' + name + '.type'
+                key = task_name + '.' + name
+                tkey = task_name + '.' + name + '.type'
                 title = param.get('title', name)
                 input_type = param['type'] if param['type'] != 'bool' else 'checkbox'
                 required = 'required' if 'required' in param and param['required'] else ''
@@ -149,7 +125,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         form += '<input type="hidden" name="{0}" value="{1}" />'.format(tkey, param['type'])
                 else:
                     logger.warning('incorrect param {0} type {1}'.format(name, param['type']))
-                
+
                 form += '</fieldset>'
 
             form += '</fieldset>'
