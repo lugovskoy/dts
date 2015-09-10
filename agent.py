@@ -240,6 +240,8 @@ def go():
                 req = None
             else:
                 req.probe(doc, db)
+        else:
+            load_configs(couch)
 
         else: # select first non-locked request
             for idx in db:
@@ -249,7 +251,6 @@ def go():
                     __idx_lock(doc, db)
                     break
 
-        load_configs(couch)
 
 
 if __name__ == '__main__':
