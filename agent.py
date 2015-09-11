@@ -11,19 +11,34 @@ import socket
 import logging as logger
 from multiprocessing import Process, Queue
 import couchdb
+import subprocess
 
 
 
 class Task:
-    def __init__(self, name, args, output_dir, log):
+    def __init__(self, name, args, conf, outdir, outlog):
         self.__args = args
         self.__log = log
         self.__name = name
-        sub_cls = getattr(__import__(name, fromlist=['SubTask']), 'SubTask')
-        self.__sub_task = sub_cls(output_dir, log)
         self.__proc = None
         self.__is_finished = False
         self.__results = None
+        self.__refs = conf.get('refs', dict())
+
+        self.__check_version(conf['version'], name)
+        sub_cls = getattr(__import__(name, fromlist=['SubTask']), 'SubTask')
+        self.__sub_task = sub_cls(outdir, outlog)
+
+
+    def __check_version(self, version, name):
+        global script_path
+        task_config = os.path.join(script_path, 'tasks', name, 'config.json')
+        if not os.path.isfile(task_config):
+            raise ValueError, "No config file for task {0}".format(name)
+        with open(task_config) as f:
+            task_config = json.load(f)
+        if int(task_config['version']) < int(version):
+            raise ValueError, "Version {0} for task {1} is too old, task must be updated".format(version, name)
 
 
     def is_initialized(self):
@@ -55,7 +70,10 @@ class Task:
 
 
     def collect_argrefs(self, tasks):
-        pass # update self.__args
+        for k, v in self.__refs: # TODO maybe better store task config and use conf['refs']
+            ref_task_name, ref_task_retarg = v.split('.')
+            ref_task = tasks[ref_task_name]
+            self.__args[k] = ref_task.get_result()[ref_task_retarg] # TODO raise missing key
 
 
     def get_result(self):
@@ -71,12 +89,14 @@ class Task:
 
 
 class Req:
-    def __init__(self, idx, doc):
+    def __init__(self, idx, doc, couch):
         self.__idx = idx
         self.__tasks = []
         self.__name2task = {}
         self.__running_task = None
         self.__finished = False
+
+        db_configs = couch['configs']
 
         global script_path
 
@@ -84,9 +104,12 @@ class Req:
             output_dir = os.path.join(script_path, 'results', doc['_id'], task_name)
             if not os.path.isdir(output_dir):
                 os.makedirs(output_dir)
-            task_log = output_dir + '.log'
-            open(task_log, 'w').close() # recreate log for a task
-            T = Task(task_name, task_opts['args'], task_opts['refs'], output_dir, task_log)
+            output_log = output_dir + '.log'
+            open(output_log, 'w').close() # recreate log for a task
+
+            task_config = db_configs[task_name]
+
+            T = Task(task_name, task_opts['args'], task_config, output_dir, output_log)
             logger.debug('Adding new task {0} with args {1}'.format(task_name, task_opts['args']))
             self.__tasks.append(T)
             self.__name2task[task_name] = T
@@ -122,7 +145,7 @@ class Req:
             self.__dump_results(self.__running_task, doc, db)
             self.__running_task = None
         else: # start & init task
-            self.__running_task.collect_argrefs(None)
+            self.__running_task.collect_argrefs(self.__name2task)
             self.__running_task.run()
 
 
@@ -135,12 +158,9 @@ class Req:
 
 
     def __dump_results(self, task, doc, db):
-        task_log_buf = open(task.get_log()).read()
-        #open(os.path.join(workdir, 'full.log'), 'a').write(task_log_buf)
-        results = task.get_result()
-
-        doc['tasks'][task.get_name()]['result'] = results
+        doc['tasks'][task.get_name()]['result'] = task.get_result()
         db.save(doc)
+        task_log_buf = open(task.get_log()).read()
         db.put_attachment(doc, task_log_buf, 'log')
 
 
@@ -160,7 +180,7 @@ def __idx_locked(doc):
     return doc['status'] != 'Waiting'
 
 
-def load_configs(couch):
+def load_and_update_tasks(couch):
     if 'tasks' not in couch:
         couch.create('tasks')
     db = couch['tasks']
@@ -172,7 +192,7 @@ def load_configs(couch):
 
     doc_dirs = db['dirs']
     doc_configs = db['configs']
-    
+
     # load task configs
     global script_path
     tasks_dir = os.path.join(script_path, 'tasks')
@@ -200,15 +220,22 @@ def load_configs(couch):
         if task_sdir not in doc_dirs['names']:
             doc_dirs['names'].append(task_sdir)
         else:
-            old_version = doc_configs[task_sdir]['version']
-            new_version = task_config['version']
-            if int(old_version) > int(new_version): # do not update with older version
+            actual_version = int(doc_configs[task_sdir]['version'])
+            installed_version = int(task_config['version'])
+            if installed_version < actual_version: # update installed task
                 task_config = doc_configs[task_sdir]
+                update_task(task_dir, task_config)
 
         doc_configs[task_sdir] = task_config
 
     db[doc_dirs.id] = doc_dirs
     db[doc_configs.id] = doc_configs
+
+
+def update_task(task_dir, task_config):
+    interpr = task_config['init']['interpreter']
+    command = task_config['init']['command']
+    retcode = subprocess.call([interpr, '-c', command])
 
 
 def go():
@@ -240,15 +267,19 @@ def go():
                 req = None
             else:
                 req.probe(doc, db)
-        else:
-            load_configs(couch)
 
         else: # select first non-locked request
+            load_and_update_tasks(couch)
             for idx in db:
                 doc = db[idx] # TODO exception
                 if not __idx_locked(doc):
-                    req = Req(idx, doc)
-                    __idx_lock(doc, db)
+                    try:
+                        req = Req(idx, doc, couch)
+                    except ValueError, e:
+                        req = None
+                        logger.warning('Cannot create new reqest because of {0}'.format(e))
+                    else:
+                        __idx_lock(doc, db)
                     break
 
 
