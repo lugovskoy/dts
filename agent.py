@@ -162,11 +162,18 @@ def update_tasks(couch):
     # load task configs
     global script_path
     tasks_dir = os.path.join(script_path, 'tasks')
+    if not os.path.isdir(tasks_dir):
+        os.makedirs(tasks_dir)
     logger.debug('Looking up for task modules in ' + tasks_dir)
-    for task_name in os.listdir(tasks_dir):
-        task_mod = __import__(task_name)
 
-        print task_mod
+    tasks_to_update = []
+    all_task_names = set(conf_names + os.listdir(tasks_dir))
+    for task_name in all_task_names:
+        try:
+            task_mod = __import__(task_name)
+        except ImportError, e:
+            tasks_to_update.append(task_name)
+            continue
 
         # TODO
         #if not all(hasattr(task_mod, a) for a in ['__version__', '__arguments', 'Task', 'setup']):
@@ -185,15 +192,22 @@ def update_tasks(couch):
             actual_version = int(conf_opts[task_name]['version'])
             installed_version = int(task_mod.Task.version)
             if installed_version < actual_version: # update installed task
-                setup_str = conf_opts[task_name]['init']
-                setup_code = setup_str.decode('base64')
-                code = marshal.loads(setup_code)
-                setup_fun = types.FunctionType(code)
-                setup_fun(os.path.join(tasks_dir, task_name))
+                tasks_to_update.append(task_name)
             elif installed_version > actual_version: # update db
                 conf_opts[task_name] = task_opts
 
     db[doc.id] = doc
+
+    for task_name in tasks_to_update:
+        setup_str = conf_opts[task_name]['init']
+        setup_code = setup_str.decode('base64')
+        code = marshal.loads(setup_code)
+        setup_fun = types.FunctionType(code, globals(), 'setup')
+        task_dir = os.path.join(tasks_dir, task_name)
+        if os.path.isdir(task_dir):
+            shutil.rmtree(task_dir)
+        os.makedirs(task_dir)
+        setup_fun(task_dir)
 
 
 def go():
