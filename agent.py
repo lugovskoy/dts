@@ -15,6 +15,7 @@ import subprocess
 import pickle
 import io
 import marshal, types
+import importlib
 #from contextlib import redirect_stdout
 
 
@@ -169,18 +170,17 @@ def update_tasks(couch):
 
     # load task configs
     global script_path
-    tasks_dir = os.path.join(script_path, 'tasks')
-    if not os.path.isdir(tasks_dir):
-        os.makedirs(tasks_dir)
     logger.debug('Looking up for task modules in ' + tasks_dir)
 
     tasks_to_update = []
     all_task_names = set(conf_names + os.listdir(tasks_dir))
     for task_name in all_task_names:
+        logger.debug('Checking task {0}'.format(task_name))
         try:
-            task_mod = __import__(task_name)
+            task_mod = importlib.import_module(task_name)
         except ImportError, e:
             tasks_to_update.append(task_name)
+            logger.debug('Cannot import task {0}: {1}'.format(task_name, e))
             continue
 
         # TODO
@@ -196,18 +196,22 @@ def update_tasks(couch):
         if task_name not in conf_names:
             conf_names.append(task_name)
             conf_opts[task_name] = task_opts
+            logger.debug('New task -> add to db')
         else:
             actual_version = int(conf_opts[task_name]['version'])
             installed_version = int(task_mod.Task.version)
             if installed_version < actual_version: # update installed task
+                logger.debug('Task should be updated')
                 tasks_to_update.append(task_name)
             elif installed_version > actual_version: # update db
                 conf_opts[task_name] = task_opts
+                logger.debug('Update task config')
 
     doc['locked'] = False
     db[doc.id] = doc
 
     for task_name in tasks_to_update:
+        logger.debug('Updating task {0}'.format(task_name))
         setup_str = conf_opts[task_name]['init']
         setup_code = setup_str.decode('base64')
         code = marshal.loads(setup_code)
@@ -273,6 +277,9 @@ if __name__ == '__main__':
     logger.basicConfig(level=logger.DEBUG)
 
     script_path = os.path.dirname(os.path.realpath(__file__))
+    tasks_dir = os.path.join(script_path, 'tasks')
+    if not os.path.isdir(tasks_dir):
+        os.makedirs(tasks_dir)
     sys.path.append(os.path.join(script_path, 'tasks'))
 
     try:
