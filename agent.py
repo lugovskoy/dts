@@ -160,6 +160,7 @@ def update_tasks(couch):
 
     while doc['locked']:
         time.sleep(0.2)
+        doc = db['config']
 
     doc['locked'] = True
     db[doc.id] = doc
