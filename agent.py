@@ -28,6 +28,7 @@ class Task:
         self.__proc = None
         self.__is_finished = False
         self.__results = None
+        self.__refs = {}
 
         task_mod = __import__(name)
 
@@ -44,16 +45,29 @@ class Task:
         #print('Got stdout: "{0}"'.format(f.getvalue()))
 
 
-    def collect_argrefs(self, tasks):
-        for k, v in self.__refs.items(): # TODO maybe better store task config and use conf['refs']
-            ref_task_name, ref_task_retarg = v.split('.')
-            ref_task = tasks[ref_task_name]
-            self.__args[k] = ref_task.get_result()[ref_task_retarg] # TODO raise missing key
+    def __collect_argrefs(self, name2task):
+        if not hasattr(self.__cls, 'refs'):
+            return dict()
+        inrefs = self.__cls.refs
+        if not isinstance(inrefs, dict):
+            raise Exception("Refs are not dict")
+
+        logger.debug('refs found: {0}'.format(inrefs))
+
+        outrefs = {}
+        for name, ref in inrefs.items():
+            rtask_name, rtask_retval_name = ref.split('.')
+            rtask_res = name2task[rtask_name].get_result()
+            if rtask_retval_name not in rtask_res:
+                raise Exception('Task {0} doesnt return val {1} referenced by another task'.format(rtask_name, rtask_retval_name))
+            outrefs[name] = rtask_res[rtask_retval_name]
+        return outrefs
 
 
-    def run(self):
+    def run(self, name2task):
+        refs = self.__collect_argrefs(name2task)
         self.__q = Queue()
-        self.__proc = Process(target=self.__cls, args=(self.__opts['args'], self.__resdir, self.__q))
+        self.__proc = Process(target=self.__cls, args=(self.__opts['args'], refs, self.__resdir, self.__q))
         self.__proc.start()
 
 
@@ -108,7 +122,7 @@ class Req:
             logger.debug('probing with {0} {1}'.format(self.__tasks, self.__proc_task))
             if len(self.__tasks) > 0:
                 self.__proc_task = self.__tasks[0]
-                self.__proc_task.run()
+                self.__proc_task.run(self.__name2task)
                 del self.__tasks[0]
         else:
             logger.debug('running task {0} is alive'.format(self.__proc_task))
@@ -140,7 +154,7 @@ def __idx_lock(doc, db):
 
 
 def __idx_unlock(doc, db):
-    doc['status'] = 'Done'
+    doc['status'] = 'Failed'
     db.save(doc)
 
 
