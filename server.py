@@ -78,9 +78,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             for task_name, task_opts in req['tasks'].items():
                 table += self.__construct_table(task_name, task_opts['args'])
+                table += self.__construct_table('Results', task_opts.get('result', dict()))
 
             table += self.__construct_table('System', {'status': req['status'], 'host': req['host']})
-            table += self.__construct_table('Results', task_opts.get('result', dict()))
             table += '</table><br/>'
         return table
 
