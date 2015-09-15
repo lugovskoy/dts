@@ -264,13 +264,13 @@ def go():
             for idx in db:
                 doc = db[idx] # TODO exception
                 if not __idx_locked(doc):
+                    __idx_lock(doc, db)
                     try:
                         req = Req(idx, doc['tasks'])
                     except Exception, e:
+                        __idx_unlock(doc, db)
                         logger.warning('Cannot create new reqest because of {0}'.format(e))
                         req = None
-                    else:
-                        __idx_lock(doc, db)
                     break
 
 
