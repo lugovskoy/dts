@@ -91,9 +91,10 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             all_task_configs = {}
         else:
             db = couch['tasks']
-            doc_dirs = db['dirs']
-            doc_configs = db['configs']
-            all_task_configs = { tdir: doc_configs[tdir] for tdir in doc_dirs['names'] }
+            doc = db['config']
+            conf_names = doc['names']
+            conf_opts  = doc['opts']
+            all_task_configs = { tdir: conf_opts[tdir] for tdir in conf_names }
 
         form = '<h2>MyForm</h2><form action=/ method=POST ENCTYPE=multipart/form-data>'
 
