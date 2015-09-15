@@ -153,7 +153,15 @@ def update_tasks(couch):
     db = couch['tasks']
 
     if 'config' not in db:
-        db['config'] = {'names': [], 'opts': {}}
+        db['config'] = {'names': [], 'opts': {}, 'locked': False}
+
+    doc = db['config']
+
+    while doc['locked']:
+        time.sleep(0.2)
+
+    doc['locked'] = True
+    db[doc.id] = doc
 
     doc = db['config']
     conf_names = doc['names']
@@ -196,6 +204,7 @@ def update_tasks(couch):
             elif installed_version > actual_version: # update db
                 conf_opts[task_name] = task_opts
 
+    doc['locked'] = False
     db[doc.id] = doc
 
     for task_name in tasks_to_update:
