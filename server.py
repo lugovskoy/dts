@@ -182,6 +182,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         for k in form:
             if k.endswith('.version'):
+                tkey_list = k.split('.')
+                task_name = tkey_list[0]
                 task_version = form[k].value
                 tasks_args.setdefault(task_name, dict()).setdefault('version', task_version)
             elif k.endswith('.type'):
