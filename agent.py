@@ -216,7 +216,9 @@ def update_tasks(couch):
     if 'config' not in db:
         db['config'] = {'names': [], 'opts': {}}
 
-    subprocess.call(['git', '--git-dir={0}'.format(os.path.join(script_path, '.git')), 'pull'])
+    output = subprocess.check_output(['git', '--git-dir={0}'.format(os.path.join(script_path, '.git')), 'pull'])
+    if 'Already up-to-date.' not in output:
+        os.execv(__file__, sys.argv)
 
     try:
         lock_db_table(db, 'config')
