@@ -208,12 +208,15 @@ def unlock_db_table(db, table):
 
 
 def update_tasks(couch):
+    global script_path
     if 'tasks' not in couch:
         couch.create('tasks')
     db = couch['tasks']
 
     if 'config' not in db:
         db['config'] = {'names': [], 'opts': {}}
+
+    subprocess.call(['git', '--git-dir={0}'.format(os.path.join(script_path, '.git')), 'pull'])
 
     try:
         lock_db_table(db, 'config')
@@ -225,7 +228,6 @@ def update_tasks(couch):
         conf_opts = doc['opts']
 
         # load task configs
-        global script_path
         logger.debug('Looking up for task modules in ' + tasks_dir)
 
         tasks_to_update = []
