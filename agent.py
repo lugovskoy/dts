@@ -218,6 +218,7 @@ def update_tasks(couch):
 
     output = subprocess.check_output(['git', '--git-dir={0}'.format(os.path.join(script_path, '.git')), 'pull'])
     if 'Already up-to-date.' not in output:
+        logger.debug('Scripts have been updates -- restarting...')
         os.execv(__file__, sys.argv)
 
     try:
