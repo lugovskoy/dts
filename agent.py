@@ -6,18 +6,24 @@ import os.path
 import sys
 import time
 import json
+import copy
 import shutil
 import socket
 import logging as logger
 from multiprocessing import Process, Queue
 import couchdb
 import subprocess
+import traceback
 import pickle
 import io
 import marshal, types
 import importlib
 #from contextlib import redirect_stdout
 
+
+__COUCH_DB_SRV    = "localhost"
+__COUCH_DB_REQ_T  = "DTS_REQESTS"
+__COUCH_DB_CONF_T = "DTS_CONFIG"
 
 
 class Task:
@@ -32,7 +38,6 @@ class Task:
 
         task_mod = __import__(name)
 
-        print opts 
         installed_version = int(task_mod.Task.version)
         actual_version = int(self.__opts['version'])
 
@@ -59,7 +64,7 @@ class Task:
             rtask_name, rtask_retval_name = ref.split('.')
             rtask_res = name2task[rtask_name].get_result()
             if rtask_retval_name not in rtask_res:
-                raise Exception('Task {0} doesnt return val {1} referenced by another task'.format(rtask_name, rtask_retval_name))
+                raise Exception('Task {0} does not return val {1} referenced by another task'.format(rtask_name, rtask_retval_name))
             outrefs[name] = rtask_res[rtask_retval_name]
         return outrefs
 
@@ -75,13 +80,15 @@ class Task:
         return self.__proc is not None and self.__proc.is_alive()
 
 
-    def is_finished(self):
-        if self.__is_finished:
-            return True
+    def probe(self):
         if self.__proc is not None and not self.__proc.is_alive():
+            self.__results = copy.deepcopy(self.__q.get())
             self.__proc.join()
+            self.__proc = None
             self.__is_finished = True
-            self.__results = self.__q.get()
+    
+    
+    def is_finished(self):
         return self.__is_finished
 
 
@@ -126,6 +133,7 @@ class Req:
                 del self.__tasks[0]
         else:
             logger.debug('running task {0} is alive'.format(self.__proc_task))
+            self.__proc_task.probe()
             if self.__proc_task.is_finished():
                 doc['tasks'][self.__proc_task.get_name()]['result'] = self.__proc_task.get_result()
             task_log_buf = self.__proc_task.get_log()
@@ -147,19 +155,56 @@ class Req:
         pass # TODO
 
 
-def __idx_lock(doc, db):
-    doc['status'] = 'Processed'
-    doc['host'] = socket.gethostname()
-    db.save(doc)
+def __idx_lock(idx, db):
+    doc = db[idx]
+    if 'status' in doc and doc['status'] == 'Waiting':
+        doc['status'] = 'Processed'
+        doc['host'] = socket.gethostname()
+        try:
+            db[doc.id] = doc
+        except couchdb.http.ResourceConflict:
+            return False
+        else:
+            return True
 
 
-def __idx_unlock(doc, db):
+def __idx_unlock(idx, db):
+    doc = db[idx]
     doc['status'] = 'Failed'
-    db.save(doc)
+    db[doc.id] = doc
 
 
-def __idx_locked(doc):
-    return doc['status'] != 'Waiting'
+def lock_db_table(db, table, timeout=0.1):
+    is_locked = False
+    while not is_locked:
+        doc = db[table]
+        while 'locked' in doc and doc['locked']:
+            logger.debug('table "{0}" is locked -- waiting '.format(table))
+            time.sleep(timeout)
+            doc = db[table]
+        doc['locked'] = True
+        try:
+            db[doc.id] = doc
+        except couchdb.http.ResourceConflict:
+            is_locked = False
+        else:
+            is_locked = True
+
+
+def unlock_db_table(db, table):
+    doc = db[table]
+    if 'locked' not in doc or not doc['locked']:
+        return
+    is_unlocked = False
+    while not is_unlocked:
+        doc = db[table]
+        doc['locked'] = False
+        try:
+            db[doc.id] = doc
+        except couchdb.http.ResourceConflict:
+            is_unlocked = False
+        else:
+            is_unlocked = True
 
 
 def update_tasks(couch):
@@ -168,62 +213,64 @@ def update_tasks(couch):
     db = couch['tasks']
 
     if 'config' not in db:
-        db['config'] = {'names': [], 'opts': {}, 'locked': False}
+        db['config'] = {'names': [], 'opts': {}}
 
-    doc = db['config']
+    try:
+        lock_db_table(db, 'config')
 
-    while doc['locked']:
-        time.sleep(0.2)
+        logger.debug('config is locked')
+
         doc = db['config']
+        conf_names = doc['names']
+        conf_opts = doc['opts']
 
-    doc['locked'] = True
-    db[doc.id] = doc
+        # load task configs
+        global script_path
+        logger.debug('Looking up for task modules in ' + tasks_dir)
 
-    doc = db['config']
-    conf_names = doc['names']
-    conf_opts = doc['opts']
-
-    # load task configs
-    global script_path
-    logger.debug('Looking up for task modules in ' + tasks_dir)
-
-    tasks_to_update = []
-    all_task_names = set(conf_names + os.listdir(tasks_dir))
-    for task_name in all_task_names:
-        logger.debug('Checking task {0}'.format(task_name))
-        try:
-            task_mod = importlib.import_module(task_name)
-        except ImportError, e:
-            tasks_to_update.append(task_name)
-            logger.debug('Cannot import task {0}: {1}'.format(task_name, e))
-            continue
-
-        # TODO
-        #if not all(hasattr(task_mod, a) for a in ['__version__', '__arguments', 'Task', 'setup']):
-        #    raise Exception("Some of module {0} argument is missed {1}".format(task_name, [hasattr(task_mod, a) for a in ['__version__', '__arguments', 'Task', 'setup']]))
-
-        setup_code = marshal.dumps(task_mod.Task.setup.func_code)
-        setup_str = setup_code.encode('base64')
-        task_opts = {'title': task_mod.Task.title,
-                     'version': task_mod.Task.version,
-                     'args': task_mod.Task.arguments,
-                     'init': setup_str}
-        if task_name not in conf_names:
-            conf_names.append(task_name)
-            conf_opts[task_name] = task_opts
-            logger.debug('New task -> add to db')
-        else:
-            actual_version = int(conf_opts[task_name]['version'])
-            installed_version = int(task_mod.Task.version)
-            if installed_version < actual_version: # update installed task
-                logger.debug('Task should be updated')
+        tasks_to_update = []
+        all_task_names = set(conf_names + os.listdir(tasks_dir))
+        for task_name in all_task_names:
+            logger.debug('Checking task {0}'.format(task_name))
+            try:
+                task_mod = importlib.import_module(task_name)
+            except ImportError, e:
                 tasks_to_update.append(task_name)
-            elif installed_version > actual_version: # update db
-                conf_opts[task_name] = task_opts
-                logger.debug('Update task config')
+                logger.debug('Cannot import task {0}: {1}'.format(task_name, e))
+                continue
 
-    doc['locked'] = False
-    db[doc.id] = doc
+            # TODO
+            #if not all(hasattr(task_mod, a) for a in ['__version__', '__arguments', 'Task', 'setup']):
+            #    raise Exception("Some of module {0} argument is missed {1}".format(task_name, [hasattr(task_mod, a) for a in ['__version__', '__arguments', 'Task', 'setup']]))
+
+            setup_code = marshal.dumps(task_mod.Task.setup.func_code)
+            setup_str = setup_code.encode('base64')
+            task_opts = {'title': task_mod.Task.title,
+                         'version': task_mod.Task.version,
+                         'args': task_mod.Task.arguments,
+                         'init': setup_str}
+            if task_name not in conf_names:
+                conf_names.append(task_name)
+                conf_opts[task_name] = task_opts
+                logger.debug('New task -> add to db')
+            else:
+                actual_version = int(conf_opts[task_name]['version'])
+                installed_version = int(task_mod.Task.version)
+                if installed_version < actual_version: # update installed task
+                    logger.debug('Task should be updated')
+                    tasks_to_update.append(task_name)
+                elif installed_version > actual_version: # update db
+                    conf_opts[task_name] = task_opts
+                    logger.debug('Update task config')
+
+        db[doc.id] = doc
+        unlock_db_table(db, 'config')
+
+    except KeyboardInterrupt:
+        unlock_db_table(db, 'config')
+        sys.exit(1)
+
+    logger.debug('config is unlocked')
 
     for task_name in tasks_to_update:
         logger.debug('Updating task {0}'.format(task_name))
@@ -272,17 +319,18 @@ def go():
             try:
                 update_tasks(couch)
             except Exception, e:
+                print(traceback.format_exc())
                 logger.warning('Cannot update tasks because of {0}'.format(e))
                 return
 
             for idx in db:
-                doc = db[idx] # TODO exception
-                if not __idx_locked(doc):
-                    __idx_lock(doc, db)
+                if __idx_lock(idx, db):
+                    doc = db[idx]
                     try:
                         req = Req(idx, doc['tasks'])
                     except Exception, e:
-                        __idx_unlock(doc, db)
+                        __idx_unlock(idx, db)
+                        print(traceback.format_exc())
                         logger.warning('Cannot create new reqest because of {0}'.format(e))
                         req = None
                     break
