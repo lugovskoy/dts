@@ -11,19 +11,21 @@ import logging as logger
 import cgi
 import BaseHTTPServer
 import SocketServer
-import formatter
+import argparse
+import socket
 
 
-
-table_name = 'requests'
+__COUCH_DB_SRV    = "localhost"
+__COUCH_DB_REQ_T  = "dts_requests"
+__COUCH_DB_CONF_T = "dts_config"
 
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def __get_log(self):
         idx = re.search('/(.+?)\.log', self.path).group(1)
-        couch = couchdb.Server()
-        db = couch[table_name]
+        couch = couchdb.Server(__COUCH_DB_SRV)
+        db = couch[__COUCH_DB_REQ_T]
         if idx not in db:
             return
         doc = db[idx]
@@ -66,8 +68,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
     def __construct_result_table(self):
-        couch = couchdb.Server()
-        db = couch[table_name]
+        couch = couchdb.Server(__COUCH_DB_SRV)
+        db = couch[__COUCH_DB_REQ_T]
         docs = [db[idx] for idx in db]
 
         table = ''
@@ -86,11 +88,11 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
     def __construct_input_form(self):
-        couch = couchdb.Server()
-        if 'tasks' not in couch:
+        couch = couchdb.Server(__COUCH_DB_SRV)
+        if __COUCH_DB_CONF_T not in couch:
             all_task_configs = {}
         else:
-            db = couch['tasks']
+            db = couch[__COUCH_DB_CONF_T]
             doc = db['config']
             conf_names = doc['names']
             conf_opts  = doc['opts']
@@ -240,8 +242,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                'status': 'Waiting',
                'tasks': tasks_args}
 
-        couch = couchdb.Server()
-        db = couch[table_name]
+        couch = couchdb.Server(__COUCH_DB_SRV)
+        db = couch[__COUCH_DB_REQ_T]
         db.save(doc)
 
 
@@ -255,13 +257,19 @@ class ForkingHTTPServer(SocketServer.ForkingMixIn, BaseHTTPServer.HTTPServer):
 if __name__ == '__main__':
     logger.basicConfig(level=logger.DEBUG)
     handler_class = MyHandler
-    try:
-        couch = couchdb.Server()
-        if table_name not in couch:
-            couch.create(table_name)
 
-        port = 8080 
-        url = "http://bop:%d/" % port
+    parser = argparse.ArgumentParser(description='server')
+    parser.add_argument('-H', action='store', metavar='<host>', help='couchdb hostnaname', default='localhost')
+    args = vars(parser.parse_args())
+    __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
+
+    try:
+        couch = couchdb.Server(__COUCH_DB_SRV)
+        if __COUCH_DB_REQ_T not in couch:
+            couch.create(__COUCH_DB_REQ_T)
+
+        port = 8080
+        url = "http://{0}:{1}/".format(socket.gethostname(), port)
         print "Ask user to visit this URL:\n\t%s" % url
         srvr = ForkingHTTPServer(('', port), handler_class)
         srvr.serve_forever()  # serve_forever

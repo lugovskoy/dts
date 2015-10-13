@@ -17,13 +17,14 @@ import traceback
 import pickle
 import io
 import marshal, types
+import argparse
 import importlib
 #from contextlib import redirect_stdout
 
 
 __COUCH_DB_SRV    = "localhost"
-__COUCH_DB_REQ_T  = "DTS_REQESTS"
-__COUCH_DB_CONF_T = "DTS_CONFIG"
+__COUCH_DB_REQ_T  = "dts_requests"
+__COUCH_DB_CONF_T = "dts_config"
 
 
 class Task:
@@ -209,9 +210,9 @@ def unlock_db_table(db, table):
 
 def update_tasks(couch):
     global script_path
-    if 'tasks' not in couch:
-        couch.create('tasks')
-    db = couch['tasks']
+    if __COUCH_DB_CONF_T not in couch:
+        couch.create(__COUCH_DB_CONF_T)
+    db = couch[__COUCH_DB_CONF_T]
 
     if 'config' not in db:
         db['config'] = {'names': [], 'opts': {}}
@@ -291,14 +292,15 @@ def update_tasks(couch):
 
 
 def go():
-
     req = None
 
     while True:
         time.sleep(1)
 
         couch = couchdb.Server()
-        db = couch['requests']
+        if __COUCH_DB_REQ_T not in couch:
+            continue
+        db = couch[__COUCH_DB_REQ_T]
 
         logger.debug('new step')
 
@@ -349,6 +351,11 @@ if __name__ == '__main__':
     if not os.path.isdir(tasks_dir):
         os.makedirs(tasks_dir)
     sys.path.append(os.path.join(script_path, 'tasks'))
+
+    parser = argparse.ArgumentParser(description='agent')
+    parser.add_argument('-H', action='store', metavar='<host>', help='couchdb hostnaname', default='localhost')
+    args = vars(parser.parse_args())
+    __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
 
     try:
         go()
