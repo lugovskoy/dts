@@ -290,6 +290,10 @@ def update_tasks(couch):
         os.makedirs(task_dir)
         setup_fun(task_dir)
 
+    if len(tasks_to_update) > 0:
+        logger.debug('Tasks have been updates -- restarting agent...')
+        os.execv(__file__, sys.argv)
+
 
 def go():
     req = None
