@@ -43,7 +43,7 @@ class Task:
         actual_version = int(self.__opts['version'])
 
         if installed_version < actual_version: # update installed task
-            raise Exception("Version {0} for task {1} is too old, task must be updated".format("", name))
+            raise Exception("Version {0} for task {1} is too old, task must be updated to {2}".format(installed_version, name, actual_version))
 
         f = io.StringIO()
         #with redirect_stdout(f):
