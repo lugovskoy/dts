@@ -263,11 +263,11 @@ def update_tasks(couch):
                 actual_version = int(conf_opts[task_name]['version'])
                 installed_version = int(task_mod.Task.version)
                 if installed_version < actual_version: # update installed task
-                    logger.debug('Task should be updated')
+                    logger.debug('Task should be updated, installed version is {0}, actual version is {1}'.format(installed_version, actual_version))
                     tasks_to_update.append(task_name)
                 elif installed_version > actual_version: # update db
+                    logger.debug('Config should be updated, installed version is {0}, actual version is {1}'.format(installed_version, actual_version))
                     conf_opts[task_name] = task_opts
-                    logger.debug('Update task config')
 
         db[doc.id] = doc
         unlock_db_table(db, 'config')
