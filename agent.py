@@ -297,7 +297,7 @@ def go():
     while True:
         time.sleep(1)
 
-        couch = couchdb.Server()
+        couch = couchdb.Server(__COUCH_DB_SRV)
         if __COUCH_DB_REQ_T not in couch:
             continue
         db = couch[__COUCH_DB_REQ_T]
