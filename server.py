@@ -15,17 +15,18 @@ import argparse
 import socket
 
 
-__COUCH_DB_SRV    = "localhost"
-__COUCH_DB_REQ_T  = "dts_requests"
-__COUCH_DB_CONF_T = "dts_config"
+COUCH_DB_SRV    = "localhost"
+COUCH_DB_REQ_T  = "dts_requests"
+COUCH_DB_CONF_T = "dts_config"
 
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def __get_log(self):
+        global COUCH_DB_SRV
         idx = re.search('/(.+?)\.log', self.path).group(1)
-        couch = couchdb.Server(__COUCH_DB_SRV)
-        db = couch[__COUCH_DB_REQ_T]
+        couch = couchdb.Server(COUCH_DB_SRV)
+        db = couch[COUCH_DB_REQ_T]
         if idx not in db:
             return
         doc = db[idx]
@@ -68,8 +69,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
     def __construct_result_table(self):
-        couch = couchdb.Server(__COUCH_DB_SRV)
-        db = couch[__COUCH_DB_REQ_T]
+        global COUCH_DB_SRV
+        couch = couchdb.Server(COUCH_DB_SRV)
+        db = couch[COUCH_DB_REQ_T]
         docs = [db[idx] for idx in db]
 
         table = ''
@@ -88,11 +90,12 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
     def __construct_input_form(self):
-        couch = couchdb.Server(__COUCH_DB_SRV)
-        if __COUCH_DB_CONF_T not in couch:
+        global COUCH_DB_SRV
+        couch = couchdb.Server(COUCH_DB_SRV)
+        if COUCH_DB_CONF_T not in couch:
             all_task_configs = {}
         else:
-            db = couch[__COUCH_DB_CONF_T]
+            db = couch[COUCH_DB_CONF_T]
             doc = db['config']
             conf_names = doc['names']
             conf_opts  = doc['opts']
@@ -242,8 +245,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                'status': 'Waiting',
                'tasks': tasks_args}
 
-        couch = couchdb.Server(__COUCH_DB_SRV)
-        db = couch[__COUCH_DB_REQ_T]
+        global COUCH_DB_SRV
+        couch = couchdb.Server(COUCH_DB_SRV)
+        db = couch[COUCH_DB_REQ_T]
         db.save(doc)
 
 
@@ -261,12 +265,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='server')
     parser.add_argument('-H', action='store', metavar='<host>', help='couchdb hostnaname', default='localhost')
     args = vars(parser.parse_args())
-    __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
+    COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
 
     try:
-        couch = couchdb.Server(__COUCH_DB_SRV)
-        if __COUCH_DB_REQ_T not in couch:
-            couch.create(__COUCH_DB_REQ_T)
+        couch = couchdb.Server(COUCH_DB_SRV)
+        if COUCH_DB_REQ_T not in couch:
+            couch.create(COUCH_DB_REQ_T)
 
         port = 8080
         url = "http://{0}:{1}/".format(socket.gethostname(), port)
