@@ -7,7 +7,6 @@ import sys
 import time
 import json
 import copy
-import shutil
 import socket
 import logging as logger
 from multiprocessing import Process, JoinableQueue
@@ -315,9 +314,8 @@ def update_tasks(couch):
         code = marshal.loads(setup_code)
         setup_fun = types.FunctionType(code, globals(), 'setup')
         task_dir = os.path.join(tasks_dir, task_name)
-        if os.path.isdir(task_dir):
-            shutil.rmtree(task_dir)
-        os.makedirs(task_dir)
+        if not os.path.isdir(task_dir):
+            os.makedirs(task_dir)
         setup_fun(task_dir)
 
     if len(tasks_to_update) > 0:
