@@ -75,6 +75,7 @@ class Task:
         try:
             res = functor(args, refs, resdir)
         except Exception as e:
+            traceback.print_exc()
             exc_q.put({'Exited by exception': repr(e)})
             exc_q.task_done()
         else:
