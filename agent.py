@@ -10,7 +10,7 @@ import copy
 import shutil
 import socket
 import logging as logger
-from multiprocessing import Process, Queue
+from multiprocessing import Process, JoinableQueue
 import couchdb
 import subprocess
 import traceback
@@ -70,10 +70,25 @@ class Task:
         return outrefs
 
 
+    @staticmethod
+    def __run_wrapper(functor, args, refs, resdir, q, exc_q):
+        try:
+            res = functor(args, refs, resdir)
+        except Exception as e:
+            exc_q.put({'Exited by exception': repr(e)})
+            exc_q.task_done()
+        else:
+            if not isinstance(res, dict):
+                res = {'result': res}
+            q.put(res)
+            q.task_done()
+
+
     def run(self, name2task):
         refs = self.__collect_argrefs(name2task)
-        self.__q = Queue()
-        self.__proc = Process(target=self.__cls, args=(self.__opts['args'], refs, self.__resdir, self.__q))
+        self.__q = JoinableQueue()
+        self.__exc_q = JoinableQueue()
+        self.__proc = Process(target=Task.__run_wrapper, args=(self.__cls, self.__opts['args'], refs, self.__resdir, self.__q, self.__exc_q))
         self.__proc.start()
 
 
@@ -82,11 +97,22 @@ class Task:
 
 
     def probe(self):
-        if self.__proc is not None and not self.__proc.is_alive():
-            self.__results = copy.deepcopy(self.__q.get())
-            self.__proc.join()
-            self.__proc = None
-            self.__is_finished = True
+        if self.__proc is None or self.__proc.is_alive():
+            return
+
+        self.__q.join()
+        self.__exc_q.join()
+
+        if not self.__exc_q.empty():
+            self.__results = self.__exc_q.get()
+        elif not self.__q.empty():
+            self.__results = self.__q.get()
+        else:
+            self.__results = {}
+        
+        self.__proc.join()
+        self.__proc = None
+        self.__is_finished = True
     
     
     def is_finished(self):
