@@ -301,6 +301,9 @@ def update_tasks(couch):
     except KeyboardInterrupt:
         unlock_db_table(db, 'config')
         sys.exit(1)
+    except Exception as e:
+        unlock_db_table(db, 'config')
+        raise e
 
     logger.debug('config is unlocked')
 
