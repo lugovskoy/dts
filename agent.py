@@ -266,7 +266,7 @@ def update_tasks(couch):
             logger.debug('Checking task {0}'.format(task_name))
             try:
                 task_mod = importlib.import_module(task_name)
-            except ImportError, e:
+            except Exception as e:
                 tasks_to_update.append(task_name)
                 logger.debug('Cannot import task {0}: {1}'.format(task_name, e))
                 continue
@@ -331,23 +331,24 @@ def go():
 
         couch = couchdb.Server(__COUCH_DB_SRV)
         if __COUCH_DB_REQ_T not in couch:
+            logger.warning('Cannot find {0} table in db, probing...'.format(__COUCH_DB_REQ_T))
             continue
         db = couch[__COUCH_DB_REQ_T]
 
-        logger.debug('new step')
+        logger.debug('Iterate...')
 
         # process already started request
         if req is not None:
             try:
                 doc = db[req.get_idx()]
             except couchdb.http.ResourceNotFound:
-                logger.debug('Couchdb is anavailable')
+                logger.debug('Couchdb is anavailable') # TODO better error handling
                 return
 
             req.probe(doc, db)
 
             if req.is_finished(): # TODO dump overall status
-                logger.debug('req is finished')
+                logger.debug('Request {0} has been done'.format(req.get_idx()))
                 #__idx_unlock(doc, db)
                 req = None
             elif doc['status'] == 'Kill':
@@ -357,17 +358,17 @@ def go():
         else: # select first non-locked request
             try:
                 update_tasks(couch)
-            except Exception, e:
+            except Exception as e:
                 print(traceback.format_exc())
                 logger.warning('Cannot update tasks because of {0}'.format(e))
-                return
+                return # TODO
 
             for idx in db:
                 if __idx_lock(idx, db):
                     doc = db[idx]
                     try:
                         req = Req(idx, doc['tasks'])
-                    except Exception, e:
+                    except Exception as e:
                         __idx_unlock(idx, db)
                         print(traceback.format_exc())
                         logger.warning('Cannot create new reqest because of {0}'.format(e))
@@ -389,8 +390,5 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
 
-    try:
-        go()
-    except KeyboardInterrupt:
-        pass
+    go()
 
