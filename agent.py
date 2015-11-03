@@ -260,8 +260,9 @@ def update_tasks(couch):
         # load task configs
         logger.debug('Looking up for task modules in ' + tasks_dir)
 
+        tasks_in_localdir = filter(lambda f: os.path.isfile(os.path.join(tasks_dir, f, '__init.py__')), os.listdir(tasks_dir))
         tasks_to_update = []
-        all_task_names = set(conf_names + os.listdir(tasks_dir))
+        all_task_names = set(conf_names + tasks_in_localdir)
         for task_name in all_task_names:
             logger.debug('Checking task {0}'.format(task_name))
             try:
