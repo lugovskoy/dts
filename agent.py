@@ -330,6 +330,15 @@ def update_tasks(couch):
         logger.debug('Tasks have been updates -- restarting agent...')
         os.execv(__file__, sys.argv)
 
+progress_chr = '-'
+def print_progress():
+    global progress_chr
+    c_map = {'-': '\\', '\\': '|', '|': '/', '/':'-'}
+    sys.stdout.write('\r')
+    sys.stdout.write(progress_chr)
+    sys.stdout.flush()
+    progress_chr = c_map[progress_chr]
+
 
 def go():
     req = None
@@ -343,6 +352,7 @@ def go():
             continue
         db = couch[__COUCH_DB_REQ_T]
 
+        print_progress()
         logger.debug('Iterate...')
 
         # process already started request
@@ -385,7 +395,6 @@ def go():
 
 
 if __name__ == '__main__':
-    logger.basicConfig(level=logger.DEBUG)
 
     script_path = os.path.dirname(os.path.realpath(__file__))
     tasks_dir = os.path.join(script_path, 'tasks')
@@ -395,7 +404,12 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='agent')
     parser.add_argument('-H', action='store', metavar='<host>', help='couchdb hostnaname', default='localhost')
+    parser.add_argument('--debug', action='store_true', help='enable debug')
     args = vars(parser.parse_args())
+    if args['debug']:
+        logger.basicConfig(level=logger.DEBUG)
+    else:
+        logger.basicConfig(level=logger.ERROR)
     __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
 
     go()
