@@ -27,10 +27,11 @@ __COUCH_DB_CONF_T = "dts_config"
 
 
 class Task:
-    def __init__(self, name, opts, resdir):
+    def __init__(self, name, opts, resdir, log):
         self.__name = name
         self.__opts = opts
         self.__resdir = resdir
+        self.__log = log
         self.__proc = None
         self.__is_finished = False
         self.__results = None
@@ -70,9 +71,9 @@ class Task:
 
 
     @staticmethod
-    def __run_wrapper(functor, args, refs, resdir, q, exc_q):
+    def __run_wrapper(functor, args, refs, resdir, log, q, exc_q):
         try:
-            res = functor(args, refs, resdir)
+            res = functor(args, refs, resdir, log)
         except Exception as e:
             traceback.print_exc()
             exc_q.put({'Exited by exception': repr(e)})
@@ -88,7 +89,7 @@ class Task:
         refs = self.__collect_argrefs(name2task)
         self.__q = JoinableQueue()
         self.__exc_q = JoinableQueue()
-        self.__proc = Process(target=Task.__run_wrapper, args=(self.__cls, self.__opts['args'], refs, self.__resdir, self.__q, self.__exc_q))
+        self.__proc = Process(target=Task.__run_wrapper, args=(self.__cls, self.__opts['args'], refs, self.__resdir, self.__log, self.__q, self.__exc_q))
         self.__proc.start()
 
 
@@ -144,8 +145,11 @@ class Req:
             resdir = os.path.join(script_path, 'results', self.__idx, task_name)
             if not os.path.isdir(resdir):
                 os.makedirs(resdir)
+            
+            log = os.path.join(script_path, 'results', self.__idx, task_name, '.log')
+            open(log, 'w').close()
 
-            T = Task(task_name, task_opts, resdir)
+            T = Task(task_name, task_opts, resdir, log)
             self.__tasks.append(T)
             self.__name2task[task_name] = T
 
