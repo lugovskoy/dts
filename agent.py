@@ -129,7 +129,9 @@ class Task:
 
 
     def get_log(self):
-        return "xxx"
+        with open(self.__log) as f:
+            data = f.read()
+        return data
 
 
 class Req:
@@ -191,6 +193,7 @@ def __idx_lock(idx, db):
     if 'status' in doc and doc['status'] == 'Waiting':
         doc['status'] = 'Processed'
         doc['host'] = socket.gethostname()
+        doc['log'] = '{0}.{1}'.format(idx, 'log')
         try:
             db[doc.id] = doc
         except couchdb.http.ResourceConflict:
