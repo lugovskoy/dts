@@ -27,10 +27,11 @@ __COUCH_DB_CONF_T = "dts_config"
 
 
 class Task:
-    def __init__(self, name, opts, resdir):
+    def __init__(self, name, opts, resdir, log):
         self.__name = name
         self.__opts = opts
         self.__resdir = resdir
+        self.__log = log
         self.__proc = None
         self.__is_finished = False
         self.__results = None
@@ -70,9 +71,9 @@ class Task:
 
 
     @staticmethod
-    def __run_wrapper(functor, args, refs, resdir, q, exc_q):
+    def __run_wrapper(functor, args, refs, resdir, log, q, exc_q):
         try:
-            res = functor(args, refs, resdir)
+            res = functor(args, refs, resdir, log)
         except Exception as e:
             traceback.print_exc()
             exc_q.put({'Exited by exception': repr(e)})
@@ -88,7 +89,7 @@ class Task:
         refs = self.__collect_argrefs(name2task)
         self.__q = JoinableQueue()
         self.__exc_q = JoinableQueue()
-        self.__proc = Process(target=Task.__run_wrapper, args=(self.__cls, self.__opts['args'], refs, self.__resdir, self.__q, self.__exc_q))
+        self.__proc = Process(target=Task.__run_wrapper, args=(self.__cls, self.__opts['args'], refs, self.__resdir, self.__log, self.__q, self.__exc_q))
         self.__proc.start()
 
 
@@ -128,7 +129,9 @@ class Task:
 
 
     def get_log(self):
-        return "xxx"
+        with open(self.__log) as f:
+            data = f.read()
+        return data
 
 
 class Req:
@@ -144,8 +147,11 @@ class Req:
             resdir = os.path.join(script_path, 'results', self.__idx, task_name)
             if not os.path.isdir(resdir):
                 os.makedirs(resdir)
+            
+            log = os.path.join(script_path, 'results', self.__idx, task_name, '.log')
+            open(log, 'w').close()
 
-            T = Task(task_name, task_opts, resdir)
+            T = Task(task_name, task_opts, resdir, log)
             self.__tasks.append(T)
             self.__name2task[task_name] = T
 
@@ -187,6 +193,7 @@ def __idx_lock(idx, db):
     if 'status' in doc and doc['status'] == 'Waiting':
         doc['status'] = 'Processed'
         doc['host'] = socket.gethostname()
+        doc['log'] = '{0}.{1}'.format(idx, 'log')
         try:
             db[doc.id] = doc
         except couchdb.http.ResourceConflict:
@@ -260,13 +267,14 @@ def update_tasks(couch):
         # load task configs
         logger.debug('Looking up for task modules in ' + tasks_dir)
 
+        tasks_in_localdir = filter(lambda f: os.path.isfile(os.path.join(tasks_dir, f, '__init.py__')), os.listdir(tasks_dir))
         tasks_to_update = []
-        all_task_names = set(conf_names + os.listdir(tasks_dir))
+        all_task_names = set(conf_names + tasks_in_localdir)
         for task_name in all_task_names:
             logger.debug('Checking task {0}'.format(task_name))
             try:
                 task_mod = importlib.import_module(task_name)
-            except ImportError, e:
+            except Exception as e:
                 tasks_to_update.append(task_name)
                 logger.debug('Cannot import task {0}: {1}'.format(task_name, e))
                 continue
@@ -331,23 +339,24 @@ def go():
 
         couch = couchdb.Server(__COUCH_DB_SRV)
         if __COUCH_DB_REQ_T not in couch:
+            logger.warning('Cannot find {0} table in db, probing...'.format(__COUCH_DB_REQ_T))
             continue
         db = couch[__COUCH_DB_REQ_T]
 
-        logger.debug('new step')
+        logger.debug('Iterate...')
 
         # process already started request
         if req is not None:
             try:
                 doc = db[req.get_idx()]
             except couchdb.http.ResourceNotFound:
-                logger.debug('Couchdb is anavailable')
+                logger.debug('Couchdb is anavailable') # TODO better error handling
                 return
 
             req.probe(doc, db)
 
             if req.is_finished(): # TODO dump overall status
-                logger.debug('req is finished')
+                logger.debug('Request {0} has been done'.format(req.get_idx()))
                 #__idx_unlock(doc, db)
                 req = None
             elif doc['status'] == 'Kill':
@@ -357,17 +366,17 @@ def go():
         else: # select first non-locked request
             try:
                 update_tasks(couch)
-            except Exception, e:
+            except Exception as e:
                 print(traceback.format_exc())
                 logger.warning('Cannot update tasks because of {0}'.format(e))
-                return
+                return # TODO
 
             for idx in db:
                 if __idx_lock(idx, db):
                     doc = db[idx]
                     try:
                         req = Req(idx, doc['tasks'])
-                    except Exception, e:
+                    except Exception as e:
                         __idx_unlock(idx, db)
                         print(traceback.format_exc())
                         logger.warning('Cannot create new reqest because of {0}'.format(e))
@@ -389,8 +398,5 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     __COUCH_DB_SRV = "http://{0}:{1}".format(args['H'], '5984')
 
-    try:
-        go()
-    except KeyboardInterrupt:
-        pass
+    go()
 
