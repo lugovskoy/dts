@@ -18,6 +18,7 @@ import socket
 COUCH_DB_SRV    = "localhost"
 COUCH_DB_REQ_T  = "dts_requests"
 COUCH_DB_CONF_T = "dts_config"
+WEB_SRV = "localhost"
 
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -69,7 +70,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
     def __construct_result_table(self):
-        global COUCH_DB_SRV
+        global COUCH_DB_SRV, WEB_SRV
         couch = couchdb.Server(COUCH_DB_SRV)
         db = couch[COUCH_DB_REQ_T]
         docs = [db[idx] for idx in db]
@@ -84,7 +85,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 table += self.__construct_table(task_name, task_opts['args'])
                 table += self.__construct_table('Results', task_opts.get('result', dict()))
 
-            table += self.__construct_table('System', {'status': req['status'], 'host': req['host']})
+            table += self.__construct_table('System', {'status': req['status'],
+                                                       'host': req['host'],
+                                                       'log': '<a>{0}/{1}</a>'.format(WEB_SRV, req['log'])})
             table += '</table><br/>'
         return table
 
@@ -243,6 +246,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                'timestampt': time.time(),
                'host': None,
                'status': 'Waiting',
+               'log': '',
                'tasks': tasks_args}
 
         global COUCH_DB_SRV
@@ -273,8 +277,8 @@ if __name__ == '__main__':
             couch.create(COUCH_DB_REQ_T)
 
         port = 8080
-        url = "http://{0}:{1}/".format(socket.gethostname(), port)
-        print "Ask user to visit this URL:\n\t%s" % url
+        WEB_SRV = "http://{0}:{1}".format(socket.gethostname(), port)
+        print "Ask user to visit this URL:\n\t%s" % WEB_SRV
         srvr = ForkingHTTPServer(('', port), handler_class)
         srvr.serve_forever()  # serve_forever
     except KeyboardInterrupt:
